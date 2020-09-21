@@ -1,17 +1,19 @@
 #include <stdio.h>
 
-#define CSC(call)                                                                                           \
-    do {                                                                                                    \
-        if (call != cudaSuccess) {                                                                          \
-            fprintf(stderr, "ERROR in %s:%d. Message: %s\n", __FILE__, __LINE__, cudaGetErrorString(call)); \
-            exit(0);                                                                                        \
-        }                                                                                                   \
+#define CSC(call)                                              \
+    do {                                                       \
+        if (call != cudaSuccess) {                             \
+            fprintf(stderr,                                    \
+                "ERROR in %s:%d. Message: %s\n",               \
+                __FILE__, __LINE__, cudaGetErrorString(call)); \
+            exit(0);                                           \
+        }                                                      \
     } while (0)
 
 __global__ void inverse(float* out, float* vec, int n)
 {
-    int i, idx = blockDim.x * blockIdx.x + threadIdx.x; // Абсолютный номер потока
-    int offset = blockDim.x * gridDim.x; // Общее кол-во потоков
+    int i, idx = blockDim.x * blockIdx.x + threadIdx.x;
+    int offset = blockDim.x * gridDim.x;
 
     for (i = idx; i < n; i += offset) {
         out[n - i - 1] = vec[i];
