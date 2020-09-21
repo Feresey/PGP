@@ -1,0 +1,140 @@
+\usepackage[utf8]{inputenc}
+\usepackage[T1, T2A]{fontenc}
+\usepackage{fullpage}
+\usepackage{multicol, multirow}
+\usepackage{tabularx}
+\usepackage{ulem}
+\usepackage{listings}
+\usepackage[english, russian]{babel}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{indentfirst}
+\usepackage{noindentafter}
+\usepackage{nonfloat}
+\usepackage{ulem}
+\usepackage{fancyhdr}
+% \usepackage{courier}
+% \usepackage{FiraMono}
+\usepackage{color}
+\usepackage{subcaption}
+\usepackage{titlesec}
+
+
+\parindent=1cm
+
+\linespread{1}
+\pgfplotsset{compat=1.16}
+\newcommand{\se}[1]{\section*{\bf #1}}
+
+\newcommand{\listsource}[2]{
+	\subsection*{\textbf{#2}}
+	{\footnotesize
+		\lstinputlisting[language=c++]{#1/#2}
+	}
+}
+
+\lstdefinestyle{empty}{language=c++,
+	basicstyle=\scriptsize,
+	showspaces=false,
+	showstringspaces=false,
+	showtabs=false, вариантов
+	tabsize=4,
+	breaklines=true,
+	escapechar=@,
+	numbers=none,
+	frame=none,
+	escapeinside={\%*}{*)},
+	breakatwhitespace=false % переносить строки только если есть пробел
+}
+
+\lstdefinestyle{customc}{
+	belowcaptionskip=1\baselineskip,
+	breaklines=true,
+	frame=L,
+	xleftmargin=\parindent,
+	language=c++,
+	numbers=left,
+	showstringspaces=false,
+	basicstyle=\footnotesize\ttfamily,
+	keywordstyle=\bfseries\color{green!40!black},
+	commentstyle=\itshape\color{purple!40!black},
+	identifierstyle=\color{blue},
+	stringstyle=\color{orange},
+}
+
+\lstset{escapechar=@,style=customc}
+
+\pgfplotsset{compat=1.17}
+
+\titleformat{\section}
+{\normalfont\Large\bfseries}{\thesection.}{0.3em}{}
+
+\titleformat{\subsection}
+{\normalfont\large\bfseries}{\thesubsection.}{0.3em}{}
+
+% \titlespacing{\section}{0pt}{*2}{*2}
+% \titlespacing{\subsection}{0pt}{*1}{*1}
+% \titlespacing{\subsubsection}{0pt}{*0}{*0}
+% \lstloadlanguages{Lisp}
+% \lstset{extendedchars=false,
+% 	escapechar= |,
+% 	breaklines=true,
+% 	breakatwhitespace=true,
+% 	keepspaces = true,
+% 	tabsize=2
+% }
+
+\newcommand{\makemytitlepage}[2]{
+	\thispagestyle{empty}
+	\begin{center}
+		\bfseries
+
+		{\Large Московский авиационный институт\\ (национальный исследовательский университет)
+
+		}
+
+		\vspace{48pt}
+
+		{\large
+			Институт №8 ``Информационные технологии и прикладная математика''
+			Кафедра 806 ``Вычислительная математика и программирование''
+		}
+
+		\vspace{36pt}
+
+		{Лабораторная работа №#1  \\
+			По курсу ``Программирование графических процессоров''
+		}
+		\vspace{48pt}
+
+		{#2}
+
+	\end{center}
+
+	\vspace{72pt}
+
+	\begin{flushright}
+		\begin{tabular}{rl}
+			Выполнил:      & П.\, А. Милько      \\
+			Группа:        & М8О-208Б-17         \\
+			Преподаватели: & К.Г. Крашенинников, \\
+			               & А.Ю. Морозов.       \\
+		\end{tabular}
+	\end{flushright}
+
+	\vfill
+
+	\begin{center}
+		\bfseries
+		Москва\\
+		\the\year
+	\end{center}
+	\newpage
+	\setcounter{page}{1}
+}
+
+\newcommand{\nvidia}[0]{
+	\se{Программное и аппаратное обеспечение}
+	
+	TODO
+}
