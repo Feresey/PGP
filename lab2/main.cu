@@ -1,44 +1,93 @@
 #include <stdio.h>
-#include <stdlib.h>
 
-#define CSC(call)                                                                                          \
-    do {                                                                                                   \
-        if (res != cudaSuccess) {                                                                          \
-            fprintf(stderr, "ERROR in %s:%d. Message: %s\n", __FILE__, __LINE__, cudaGetErrorString(res)); \
-            exit(0);                                                                                       \
-        }                                                                                                  \
+#include "serialize.h"
+
+#define CSC(call)                                              \
+    do {                                                       \
+        if (call != cudaSuccess) {                             \
+            fprintf(stderr,                                    \
+                "ERROR in %s:%d. Message: %s\n",               \
+                __FILE__, __LINE__, cudaGetErrorString(call)); \
+            exit(0);                                           \
+        }                                                      \
     } while (0)
 
-__global__ void kernel(int* arr, int n)
+texture<uchar4, 2, cudaReadModeElementType> tex;
+
+__global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
 {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int offset = blockDim.x * gridDim.x;
-    while (idx < n) {
-        arr[idx] *= 2;
-        idx += offset;
+    int idx = blockDim.x * blockIdx.x + threadIdx.x;
+    int idy = blockDim.y * blockIdx.y + threadIdx.y;
+    int offsetx = blockDim.x * gridDim.x;
+    int offsety = blockDim.y * gridDim.y;
+
+    for (int x = idx; x < w; x += offsetx) {
+        for (int y = idy; y < h; y += offsety) {
+            out[x + y * w] = uchar4(tex2D(tex, x, y));
+        }
     }
 }
 
-int main()
+
+int main(int argc, char** argv)
 {
-    int i, n = 100000000;
-    int* arr = (int*)malloc(sizeof(int) * n);
-    for (i = 0; i < n; i++)
-        arr[i] = i;
+    int blocks = 1;
+    int threads = 32;
+#ifdef BENCHMARK
+    for (int i = 1; i < argc; i += 2) {
+        if (strcmp(argv[i], "-blocks") == 0) {
+            blocks = atoi(argv[i + 1]);
+        } else if (strcmp(argv[i], "-threads") == 0) {
+            threads = atoi(argv[i + 1]);
+        }
+    }
+#endif
 
-    int* dev_arr;
+    char input[100], output[200];
 
-    CSC(cudaMalloc(&dev_arr, sizeof(int) * n));
-    CSC(cudaMemcpy(dev_arr, arr, sizeof(int) * n, cudaMemcpyHostToDevice));
+    scanf("%s", input);
+    scanf("%s", output);
 
+    FILE* in = fopen(input, "rb");
+
+    uint32_t* data;
+    uint32_t w, h;
+    uint32_t err;
+    err = read_image(in, &data, &w, &h);
+    if (err != 0) {
+        printf("ERROR in %s:%d scan image: %d", __FILE__, __LINE__, err);
+        exit(0);
+    }
+    fclose(in);
+
+    cudaArray* arr;
+    cudaChannelFormatDesc ch = cudaCreateChannelDesc<uchar4>();
+    CSC(cudaMallocArray(&arr, &ch, w, h));
+    CSC(cudaMemcpyToArray(arr, 0, 0, data, sizeof(uchar4) * h * w, cudaMemcpyHostToDevice));
+
+    tex.addressMode[0] = cudaAddressModeClamp;
+    tex.addressMode[1] = cudaAddressModeClamp;
+    tex.channelDesc = ch;
+    tex.filterMode = cudaFilterModePoint;
+    tex.normalized = false;
+
+    CSC(cudaBindTextureToArray(tex, arr, ch));
+    uchar4* dev_data;
+    CSC(cudaMalloc(&dev_data, sizeof(uchar4) * h * w));
+
+#ifdef BENCHMARK
     cudaEvent_t start, end;
     CSC(cudaEventCreate(&start));
     CSC(cudaEventCreate(&end));
     CSC(cudaEventRecord(start));
 
-    kernel<<<256, 256>>>(dev_arr, n);
+    fprintf(stderr, "blocks = %d\nthreads = %d\n", blocks, threads);
+#endif
+
+    kernel<<<dim3(blocks, blocks), dim3(threads, threads)>>>(dev_data, w, h);
     CSC(cudaGetLastError());
 
+#ifdef BENCHMARK
     CSC(cudaEventRecord(end));
     CSC(cudaEventSynchronize(end));
     float t;
@@ -46,14 +95,20 @@ int main()
     CSC(cudaEventDestroy(start));
     CSC(cudaEventDestroy(end));
 
-    printf("time = %f\n", t);
+    fprintf(stderr, "time = %010.6f\n", t);
+#endif
 
-    CSC(cudaMemcpy(arr, dev_arr, sizeof(int) * n, cudaMemcpyDeviceToHost));
-    CSC(cudaFree(dev_arr));
+    CSC(cudaMemcpy(data, dev_data, sizeof(uchar4) * h * w, cudaMemcpyDeviceToHost));
 
-    for (i = n - 10; i < n; i++)
-        printf("%d ", arr[i]);
-    printf("\n");
-    free(arr);
-    return 0;
+    FILE* out = fopen(output, "wb");
+    err = write_image(out, data, w, h);
+    if (err != 0) {
+        printf("ERROR in %s:%d write image: %d", __FILE__, __LINE__, err);
+    }
+    fclose(out);
+
+    CSC(cudaUnbindTexture(tex));
+    CSC(cudaFreeArray(arr));
+    CSC(cudaFree(dev_data));
+    free(data);
 }
