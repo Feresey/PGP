@@ -14,6 +14,11 @@
 
 texture<uchar4, 2, cudaReadModeElementType> tex;
 
+__device__ unsigned char norm(uchar4 u)
+{
+    return (u.x + u.y + u.z) / 3;
+}
+
 __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
 {
     int idx = blockDim.x * blockIdx.x + threadIdx.x;
@@ -21,13 +26,37 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
     int offsetx = blockDim.x * gridDim.x;
     int offsety = blockDim.y * gridDim.y;
 
+    unsigned char z[9];
+    int left, right, top, bottom;
+    int g_x, g_y;
     for (int x = idx; x < w; x += offsetx) {
         for (int y = idy; y < h; y += offsety) {
-            out[x + y * w] = uchar4(tex2D(tex, x, y));
+
+            left = x == 0 ? 0 : x - 1;
+            right = x == (h - 1) ? (h - 1) : x + 1;
+            top = y == 0 ? 0 : y - 1;
+            bottom = y == (w - 1) ? (w - 1) : y + 1;
+
+            z[0] = norm(tex2D(tex, left, top));
+            z[1] = norm(tex2D(tex, x, top));
+            z[2] = norm(tex2D(tex, right, top));
+
+            z[3] = norm(tex2D(tex, left, y));
+            z[4] = norm(tex2D(tex, x, y));
+            z[5] = norm(tex2D(tex, right, y));
+
+            z[6] = norm(tex2D(tex, left, bottom));
+            z[7] = norm(tex2D(tex, x, bottom));
+            z[8] = norm(tex2D(tex, right, bottom));
+
+            g_x = int(z[6] + z[7] + z[8]) - int(z[0] + z[1] + z[2]);
+            g_y = int(z[2] + z[5] + z[8]) - int(z[0] + z[3] + z[6]);
+
+            unsigned char res = (unsigned char)(sqrtf(float(g_x * g_x) + float(g_y * g_y)));
+            out[x + y * w] = make_uchar4(res, res, res, 255);
         }
     }
 }
-
 
 int main(int argc, char** argv)
 {
@@ -49,6 +78,10 @@ int main(int argc, char** argv)
     scanf("%s", output);
 
     FILE* in = fopen(input, "rb");
+    if (ferror(in)) {
+        printf("ERROR opening input file: %s\n", input);
+        exit(0);
+    }
 
     uint32_t* data;
     uint32_t w, h;
