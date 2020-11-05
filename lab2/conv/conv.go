@@ -62,8 +62,6 @@ func NewImage(r io.Reader, w, h uint32) (image.Image, error) {
 		buf: make([][]color.RGBA, h),
 	}
 
-	fmt.Printf("w is %d. h is %d.\n", res.w, res.h)
-
 	buf := make([]byte, 4)
 	r = bufio.NewReaderSize(r, 1<<20)
 	for y := 0; y < res.h; y++ {

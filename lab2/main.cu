@@ -40,9 +40,9 @@ int write_image(FILE* f, uint32_t* data, uint32_t w, uint32_t h)
 
 texture<uchar4, 2, cudaReadModeElementType> tex;
 
-__device__ unsigned char norm(uchar4 u)
+__device__ float norm(uchar4 u)
 {
-    return (u.x + u.y + u.z) / 3;
+    return roundf(0.299*float(u.x) + 0.587*float(u.y) + 0.144*float(u.z));
 }
 
 __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
@@ -52,7 +52,7 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
     int offsetx = blockDim.x * gridDim.x;
     int offsety = blockDim.y * gridDim.y;
 
-    unsigned char z[9];
+    float z[9];
     int left, right, top, bottom;
     int g_x, g_y;
     for (int x = idx; x < w; x += offsetx) {
@@ -75,10 +75,10 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
             z[7] = norm(tex2D(tex, x, bottom));
             z[8] = norm(tex2D(tex, right, bottom));
 
-            g_x = int(z[6] + z[7] + z[8]) - int(z[0] + z[1] + z[2]);
-            g_y = int(z[2] + z[5] + z[8]) - int(z[0] + z[3] + z[6]);
+            g_x = (z[6] + z[7] + z[8]) - (z[0] + z[1] + z[2]);
+            g_y = (z[2] + z[5] + z[8]) - (z[0] + z[3] + z[6]);
 
-            unsigned char res = (unsigned char)(sqrtf(float(g_x * g_x) + float(g_y * g_y)));
+            unsigned char res = (unsigned char)(__fsqrt_ru((g_x * g_x) + (g_y * g_y)));
             out[x + y * w] = make_uchar4(res, res, res, 255);
         }
     }
