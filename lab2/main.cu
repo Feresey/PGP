@@ -54,7 +54,7 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
 
     float z[9];
     int left, right, top, bottom;
-    int g_x, g_y;
+    float g_x, g_y;
     for (int x = idx; x < w; x += offsetx) {
         for (int y = idy; y < h; y += offsety) {
 
