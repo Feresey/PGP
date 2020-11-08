@@ -12,8 +12,6 @@
         };                      \
     }
 
-typedef unsigned char uchar;
-
 // да, костыль
 int blocks = 1;
 int threads = 32;
@@ -47,9 +45,9 @@ __device__ float distance(const uchar4 a, const uchar4 b)
 
 __device__ __constant__ uchar4 dev_centers[500];
 
-__device__ uchar calc_best_distance(uchar4 point, uchar* affiliation, int n)
+__device__ int calc_best_distance(uchar4 point, int* affiliation, int n)
 {
-    uchar best_class = 255;
+    int best_class = 255;
     float best_distance = 450; // sqrt(255*255 * 3) = 441.6729559300637
 
     float curr_distance;
@@ -66,7 +64,7 @@ __device__ uchar calc_best_distance(uchar4 point, uchar* affiliation, int n)
 
 // классификация пикселей по текущим центрам групп.
 __global__ void classify(
-    uchar4* data, uchar* affiliation, int n, int n_classes)
+    uchar4* data, int* affiliation, int n, int n_classes)
 {
     int id = blockDim.x * blockIdx.x + threadIdx.x;
     int offset = blockDim.x * gridDim.x;
@@ -76,8 +74,8 @@ __global__ void classify(
     }
 }
 
-// сравнение двух массивов классов.
-__global__ void compare_arrays(uchar* prev, uchar* next, unsigned int* result, int n)
+// сравнение двух массивов классификации пикселей.
+__global__ void compare_arrays(int* prev, int* next, unsigned int* result, int n)
 {
     int id = blockDim.x * blockIdx.x + threadIdx.x;
     int offset = blockDim.x * gridDim.x;
@@ -85,6 +83,48 @@ __global__ void compare_arrays(uchar* prev, uchar* next, unsigned int* result, i
         if (prev[i] != next[i]) {
             atomicAdd(result, 1);
         }
+    }
+}
+
+// вычисление новых центров классов
+__global__ void identify_centers(
+    uchar4* data, int* affiliations, int n,
+    uchar4* new_centers, uint4* cache, int* cache_count, int n_classes)
+{
+    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    int offset = blockDim.x * gridDim.x;
+
+    // суммирование значений пикселей по классам
+    uchar4 elem;
+    int affiliation;
+    for (int i = id; i < n; i += offset) {
+        affiliation = affiliations[i];
+        elem = data[i];
+
+        uint4 center = cache[affiliation];
+        center.x += int(elem.x);
+        center.y += int(elem.y);
+        center.z += int(elem.z);
+        center.w = affiliation;
+        cache[affiliation] = center;
+
+        cache_count[affiliation]++;
+    }
+
+    __syncthreads();
+    // присваивание новых значений центров классов.
+    for (int i = id; i < n_classes; i += offset) {
+        uint4 cache_elem = cache[i];
+        int count = cache_count[i];
+        cache_elem.x /= count;
+        cache_elem.y /= count;
+        cache_elem.z /= count;
+        uchar4 elem;
+        elem.x = cache_elem.x;
+        elem.y = cache_elem.y;
+        elem.z = cache_elem.z;
+        elem.w = cache_elem.w;
+        new_centers[i] = elem;
     }
 }
 
@@ -98,16 +138,20 @@ void launch_k_means(uchar4* data, const int w, const int h, const Center* start_
 
     uchar4* dev_next_centers;
     uchar4* dev_data;
-    uchar
+    uint4* dev_cache;
+    int* dev_cache_count;
+    int
         *dev_prev_affiliation,
         *dev_next_affiliation;
 
     CSC(cudaMalloc(&dev_next_centers, sizeof(uchar4) * n));
+    CSC(cudaMalloc(&dev_cache, sizeof(uint4) * n));
+    CSC(cudaMalloc(&dev_cache_count, sizeof(int) * n));
 
-    CSC(cudaMalloc(&dev_next_affiliation, sizeof(uchar) * n));
-    CSC(cudaMalloc(&dev_prev_affiliation, sizeof(uchar) * n));
+    CSC(cudaMalloc(&dev_next_affiliation, sizeof(int) * n));
+    CSC(cudaMalloc(&dev_prev_affiliation, sizeof(int) * n));
     // ?
-    CSC(cudaMemset(dev_prev_affiliation, 255, sizeof(uchar) * n));
+    CSC(cudaMemset(dev_prev_affiliation, 255, sizeof(int) * n));
 
     CSC(cudaMalloc(&dev_data, sizeof(uchar4) * n));
     CSC(cudaMemcpy(dev_data, data, n, cudaMemcpyHostToDevice));
@@ -139,17 +183,21 @@ void launch_k_means(uchar4* data, const int w, const int h, const Center* start_
         START_KERNEL(
             blocks, threads, compare_arrays,
             dev_prev_affiliation, dev_next_affiliation, dev_equal, n_classes)
-
         CSC(cudaMemcpy(&equal, dev_equal, sizeof(unsigned int), cudaMemcpyDeviceToHost));
         if (equal == 0) {
             break;
         }
 
-        // START_KERNEL
-
-        uchar* tmp = dev_prev_affiliation;
+        // вычисление новых центров классов
+        int* tmp = dev_prev_affiliation;
         dev_prev_affiliation = dev_next_affiliation;
         dev_next_affiliation = tmp;
+        CSC(cudaMemset(dev_cache, 0, sizeof(uint4) * n));
+        CSC(cudaMemset(dev_cache_count, 0, sizeof(int) * n));
+        START_KERNEL(
+            blocks, threads, identify_centers,
+            data, dev_next_affiliation, n,
+            dev_next_centers, dev_cache, dev_cache_count, n_classes)
     }
     CSC(cudaFree(dev_equal));
 
@@ -158,6 +206,8 @@ void launch_k_means(uchar4* data, const int w, const int h, const Center* start_
     CSC(cudaFree(dev_next_affiliation));
     CSC(cudaFree(dev_prev_affiliation));
     CSC(cudaFree(dev_next_centers));
+    CSC(cudaFree(dev_cache));
+    CSC(cudaFree(dev_cache_count));
 }
 
 int main()
@@ -202,7 +252,7 @@ int main()
     }
     fclose(in);
 
-    launch_k_means(data, h, w,  centers, n_classes);
+    launch_k_means(data, h, w, centers, n_classes);
 
     FILE* out = fopen(output, "wb");
     err = write_image(out, data, w, h);
