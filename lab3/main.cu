@@ -45,7 +45,7 @@ __device__ float distance(const uchar4 a, const uchar4 b)
 
 __device__ __constant__ uchar4 dev_centers[500];
 
-__device__ int calc_best_distance(uchar4 point, int* affiliation, int n)
+__device__ int calc_best_distance(uchar4 point, int n)
 {
     int best_class = 255;
     float best_distance = 450; // sqrt(255*255 * 3) = 441.6729559300637
@@ -70,7 +70,7 @@ __global__ void classify(
     int offset = blockDim.x * gridDim.x;
 
     for (int i = id; i < n; i += offset) {
-        int best = calc_best_distance(data[i], affiliation, n_classes);
+        int best = calc_best_distance(data[i], n_classes);
         affiliation[i] = best;
         data[i].w = best;
     }
@@ -132,7 +132,7 @@ typedef struct {
     int x, y;
 } Center;
 
-void launch_k_means(uchar4* data, const int w, const int h, const Center* start_centers, const int n_classes)
+void launch_k_means(uchar4* host_data, const int w, const int h, const Center* start_centers, const int n_classes)
 {
     const int n = h * w;
 
@@ -154,14 +154,14 @@ void launch_k_means(uchar4* data, const int w, const int h, const Center* start_
     CSC(cudaMemset(dev_prev_affiliation, 255, sizeof(int) * n));
 
     CSC(cudaMalloc(&dev_data, sizeof(uchar4) * n));
-    CSC(cudaMemcpy(dev_data, data, n, cudaMemcpyHostToDevice));
+    CSC(cudaMemcpy(dev_data, host_data, sizeof(uchar4) * n, cudaMemcpyHostToDevice));
 
     {
         uchar4* tmp_centers;
         // значения указанных пикселей.
         tmp_centers = (uchar4*)malloc(sizeof(uchar4) * n);
         for (int i = 0; i < n; i++) {
-            tmp_centers[i] = data[start_centers[i].x * w + start_centers[i].y];
+            tmp_centers[i] = host_data[start_centers[i].x * w + start_centers[i].y];
         }
         CSC(cudaMemcpyToSymbol(dev_centers, tmp_centers, sizeof(uchar4) * n));
         free(tmp_centers);
@@ -169,11 +169,14 @@ void launch_k_means(uchar4* data, const int w, const int h, const Center* start_
 
     int i = 0;
     while (i != 1) {
-        i = 1;
+        // i = 1;
+        CSC(cudaDeviceSynchronize());
         // вычисление принадлежности к классам
         START_KERNEL(
             blocks, threads, classify,
-            data, n, dev_next_affiliation, n_classes)
+            dev_data, n, dev_next_affiliation, n_classes)
+
+        CSC(cudaDeviceSynchronize());
 
         // сравнение предыдущей классификации и текущей
         unsigned long long
@@ -199,13 +202,13 @@ void launch_k_means(uchar4* data, const int w, const int h, const Center* start_
         CSC(cudaMemset(dev_cache_count, 0, sizeof(int) * n));
         START_KERNEL(
             blocks, threads, identify_centers,
-            data, dev_next_affiliation, n,
+            dev_data, dev_next_affiliation, n,
             dev_next_centers, dev_cache, dev_cache_count, n_classes)
 
         CSC(cudaMemcpyToSymbol(dev_centers, dev_next_centers, sizeof(uchar4) * n, 0, cudaMemcpyDeviceToDevice));
     }
 
-    CSC(cudaMemcpy(data, dev_data, sizeof(uchar4) * n, cudaMemcpyDeviceToHost));
+    CSC(cudaMemcpy(host_data, dev_data, sizeof(uchar4) * n, cudaMemcpyDeviceToHost));
     CSC(cudaFree(dev_data));
     CSC(cudaFree(dev_next_affiliation));
     CSC(cudaFree(dev_prev_affiliation));
