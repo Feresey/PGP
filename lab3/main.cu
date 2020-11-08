@@ -64,18 +64,20 @@ __device__ int calc_best_distance(uchar4 point, int* affiliation, int n)
 
 // классификация пикселей по текущим центрам групп.
 __global__ void classify(
-    uchar4* data, int* affiliation, int n, int n_classes)
+    uchar4* data, int n, int* affiliation, int n_classes)
 {
     int id = blockDim.x * blockIdx.x + threadIdx.x;
     int offset = blockDim.x * gridDim.x;
 
     for (int i = id; i < n; i += offset) {
-        affiliation[i] = calc_best_distance(data[i], affiliation, n_classes);
+        int best = calc_best_distance(data[i], affiliation, n_classes);
+        affiliation[i] = best;
+        data[i].w = best;
     }
 }
 
 // сравнение двух массивов классификации пикселей.
-__global__ void compare_arrays(int* prev, int* next, unsigned int* result, int n)
+__global__ void compare_arrays(int* prev, int* next, unsigned long long* result, int n)
 {
     int id = blockDim.x * blockIdx.x + threadIdx.x;
     int offset = blockDim.x * gridDim.x;
@@ -89,7 +91,7 @@ __global__ void compare_arrays(int* prev, int* next, unsigned int* result, int n
 // вычисление новых центров классов
 __global__ void identify_centers(
     uchar4* data, int* affiliations, int n,
-    uchar4* new_centers, uint4* cache, int* cache_count, int n_classes)
+    uchar4* new_centers, uint3* cache, int* cache_count, int n_classes)
 {
     int id = blockDim.x * blockIdx.x + threadIdx.x;
     int offset = blockDim.x * gridDim.x;
@@ -101,11 +103,10 @@ __global__ void identify_centers(
         affiliation = affiliations[i];
         elem = data[i];
 
-        uint4 center = cache[affiliation];
+        uint3 center = cache[affiliation];
         center.x += int(elem.x);
         center.y += int(elem.y);
         center.z += int(elem.z);
-        center.w = affiliation;
         cache[affiliation] = center;
 
         cache_count[affiliation]++;
@@ -114,7 +115,7 @@ __global__ void identify_centers(
     __syncthreads();
     // присваивание новых значений центров классов.
     for (int i = id; i < n_classes; i += offset) {
-        uint4 cache_elem = cache[i];
+        uint3 cache_elem = cache[i];
         int count = cache_count[i];
         cache_elem.x /= count;
         cache_elem.y /= count;
@@ -123,7 +124,6 @@ __global__ void identify_centers(
         elem.x = cache_elem.x;
         elem.y = cache_elem.y;
         elem.z = cache_elem.z;
-        elem.w = cache_elem.w;
         new_centers[i] = elem;
     }
 }
@@ -138,14 +138,14 @@ void launch_k_means(uchar4* data, const int w, const int h, const Center* start_
 
     uchar4* dev_next_centers;
     uchar4* dev_data;
-    uint4* dev_cache;
+    uint3* dev_cache;
     int* dev_cache_count;
     int
         *dev_prev_affiliation,
         *dev_next_affiliation;
 
     CSC(cudaMalloc(&dev_next_centers, sizeof(uchar4) * n));
-    CSC(cudaMalloc(&dev_cache, sizeof(uint4) * n));
+    CSC(cudaMalloc(&dev_cache, sizeof(uint3) * n));
     CSC(cudaMalloc(&dev_cache_count, sizeof(int) * n));
 
     CSC(cudaMalloc(&dev_next_affiliation, sizeof(int) * n));
@@ -167,39 +167,43 @@ void launch_k_means(uchar4* data, const int w, const int h, const Center* start_
         free(tmp_centers);
     }
 
-    unsigned int
-        equal,
-        *dev_equal;
-    CSC(cudaMalloc(&dev_equal, sizeof(unsigned int)));
-
-    while (true) {
+    int i = 0;
+    while (i != 1) {
+        i = 1;
         // вычисление принадлежности к классам
         START_KERNEL(
             blocks, threads, classify,
-            data, dev_next_affiliation, n, n_classes)
+            data, n, dev_next_affiliation, n_classes)
 
         // сравнение предыдущей классификации и текущей
-        CSC(cudaMemset(dev_equal, 0, sizeof(unsigned int)));
+        unsigned long long
+            equal = 0,
+            *dev_equal;
+        CSC(cudaMalloc(&dev_equal, sizeof(unsigned long long)));
+
+        CSC(cudaMemset(dev_equal, 0, sizeof(unsigned long long)));
         START_KERNEL(
             blocks, threads, compare_arrays,
-            dev_prev_affiliation, dev_next_affiliation, dev_equal, n_classes)
-        CSC(cudaMemcpy(&equal, dev_equal, sizeof(unsigned int), cudaMemcpyDeviceToHost));
+            dev_prev_affiliation, dev_next_affiliation, dev_equal, n)
+        CSC(cudaMemcpy(&equal, dev_equal, sizeof(unsigned long long), cudaMemcpyDeviceToHost));
         if (equal == 0) {
             break;
         }
+        CSC(cudaFree(dev_equal));
 
         // вычисление новых центров классов
         int* tmp = dev_prev_affiliation;
         dev_prev_affiliation = dev_next_affiliation;
         dev_next_affiliation = tmp;
-        CSC(cudaMemset(dev_cache, 0, sizeof(uint4) * n));
+        CSC(cudaMemset(dev_cache, 0, sizeof(uint3) * n));
         CSC(cudaMemset(dev_cache_count, 0, sizeof(int) * n));
         START_KERNEL(
             blocks, threads, identify_centers,
             data, dev_next_affiliation, n,
             dev_next_centers, dev_cache, dev_cache_count, n_classes)
+
+        CSC(cudaMemcpyToSymbol(dev_centers, dev_next_centers, sizeof(uchar4) * n, 0, cudaMemcpyDeviceToDevice));
     }
-    CSC(cudaFree(dev_equal));
 
     CSC(cudaMemcpy(data, dev_data, sizeof(uchar4) * n, cudaMemcpyDeviceToHost));
     CSC(cudaFree(dev_data));
