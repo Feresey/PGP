@@ -4,8 +4,9 @@
 
 #include "serialize.h"
 
-#define CSC(call)                                              \
+#define CSC(kal)                                               \
     do {                                                       \
+        auto call = kal;                                       \
         if (call != cudaSuccess) {                             \
             fprintf(stderr,                                    \
                 "ERROR in %s:%d. Message: %s\n",               \
@@ -18,7 +19,7 @@ texture<uchar4, 2, cudaReadModeElementType> tex;
 
 __device__ float norm(uchar4 u)
 {
-    return roundf(0.299*float(u.x) + 0.587*float(u.y) + 0.144*float(u.z));
+    return float(u.x+u.y+u.z)/3.0;
 }
 
 __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
@@ -34,10 +35,10 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
     for (int x = idx; x < w; x += offsetx) {
         for (int y = idy; y < h; y += offsety) {
 
-            left = x == 0 ? 0 : x - 1;
-            right = x == (h - 1) ? (h - 1) : x + 1;
-            top = y == 0 ? 0 : y - 1;
-            bottom = y == (w - 1) ? (w - 1) : y + 1;
+            left = (x == 0) ? x : x - 1;
+            right = (x == (h - 1)) ? x : x + 1;
+            top = (y == 0) ? y : y - 1;
+            bottom = (y == (w - 1)) ? y : y + 1;
 
             z[0] = norm(tex2D(tex, left, top));
             z[1] = norm(tex2D(tex, x, top));
@@ -63,7 +64,7 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
 int main(int argc, char** argv)
 {
     int blocks = 1;
-    int threads = 32;
+    int threads = 8;
 #ifdef BENCHMARK
     for (int i = 1; i < argc; i += 2) {
         if (strcmp(argv[i], "-blocks") == 0) {
