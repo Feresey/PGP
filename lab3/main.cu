@@ -4,27 +4,32 @@
 
 #include "helpers.h"
 
+#define EPS 1e-3
+#define IN_EPS(EQ) (abs(EQ) < EPS)
+
 // да, костыль
 int blocks = 1;
 int threads = 32;
 
-__device__ __constant__ uchar4 dev_centers[500];
+__device__ __constant__ float4 dev_centers[500];
 
-__device__ int distance(const uchar4& a, const uchar4& b)
+__device__ float distance(const uchar4& a, const float4& b)
 {
-    int x = a.x - b.x,
-        y = a.y - b.y,
-        z = a.z - b.z;
+    // printf("%f %f %f\n", b.x, b.y, b.z);
+    float x = b.x - a.x,
+          y = b.y - a.y,
+          z = b.z - a.z;
     return x * x + y * y + z * z;
 }
 
-__device__ int calc_best_distance(const uchar4& point, const int n)
+__device__ int calc_best_distance(const uchar4& point, const int n_classes)
 {
     int best_class = 255;
-    int best_distance = 195075; // 255*255 * 3
+    float best_distance = 690420;
 
-    for (int i = 0; i < n; i++) {
-        int curr_distance = distance(point, dev_centers[i]);
+    for (int i = 0; i < n_classes; i++) {
+        float curr_distance = distance(point, dev_centers[i]);
+        // printf("compare %f<>%f\n", curr_distance, best_distance);
         if (curr_distance < best_distance) {
             best_class = i;
             best_distance = curr_distance;
@@ -34,10 +39,18 @@ __device__ int calc_best_distance(const uchar4& point, const int n)
     return best_class;
 }
 
+__device__ float norm(float4 a, float4 b)
+{
+    float x = a.x - b.x,
+          y = a.y - b.y,
+          z = a.z - b.z;
+    return x * x + y * y + z * z;
+}
+
 // классификация пикселей по текущим центрам групп.
 __global__ void kernel(
     uchar4* data, int n,
-    uchar4* new_centers, ulonglong4* cache, int n_classes,
+    float4* new_centers, ulonglong4* cache, int n_classes,
     unsigned long long* equal)
 {
     int id = blockDim.x * blockIdx.x + threadIdx.x;
@@ -45,14 +58,11 @@ __global__ void kernel(
 
     for (int i = id; i < n; i += offset) {
         data[i].w = calc_best_distance(data[i], n_classes);
-    }
 
-    __syncthreads();
-    // вычисление новых центров классов
-    // суммирование значений пикселей по классам
-    for (int i = id; i < n; i += offset) {
+        // вычисление новых центров классов
+        // суммирование значений пикселей по классам
         uchar4 elem = data[i];
-        ulonglong4* cache_elem = cache + elem.w;
+        ulonglong4* cache_elem = &cache[elem.w];
         atomicAdd(&cache_elem->x, elem.x);
         atomicAdd(&cache_elem->y, elem.y);
         atomicAdd(&cache_elem->z, elem.z);
@@ -63,19 +73,17 @@ __global__ void kernel(
     // присваивание новых значений центров классов.
     for (int i = id; i < n_classes; i += offset) {
         ulonglong4 cache_elem = cache[i];
-        cache_elem.x = roundf(float(cache_elem.x) / cache_elem.w);
-        cache_elem.y = roundf(float(cache_elem.y) / cache_elem.w);
-        cache_elem.z = roundf(float(cache_elem.z) / cache_elem.w);
-
-        uchar4 elem;
-        elem.x = cache_elem.x;
-        elem.y = cache_elem.y;
-        elem.z = cache_elem.z;
+        float4 elem = make_float4(
+            float(cache_elem.x) / cache_elem.w,
+            float(cache_elem.y) / cache_elem.w,
+            float(cache_elem.z) / cache_elem.w,
+            0.0f);
         new_centers[i] = elem;
 
         // условие сходимости -- центры не изменились
-        uchar4 old = dev_centers[i];
-        if (elem.x != old.x || elem.y != old.y || elem.z != old.z) {
+        float4 old = dev_centers[i];
+        if (norm(old, elem) > EPS) {
+            // printf("%f %f %f <> %f %f %f\n", old.x, old.y, old.z, elem.x, elem.y, elem.z);
             atomicAdd(equal, 1);
         }
     }
@@ -89,22 +97,23 @@ void launch_k_means(uchar4* host_data, const int w, const int h, const Center* s
 {
     const int n = h * w;
 
-    uchar4* dev_next_centers;
+    float4* dev_next_centers;
     uchar4* dev_data;
     ulonglong4* dev_cache;
 
-    CSC(cudaMalloc(&dev_next_centers, sizeof(uchar4) * n));
+    CSC(cudaMalloc(&dev_next_centers, sizeof(float4) * n));
     CSC(cudaMalloc(&dev_cache, sizeof(ulonglong4) * n));
 
     CSC(cudaMalloc(&dev_data, sizeof(uchar4) * n));
     CSC(cudaMemcpy(dev_data, host_data, sizeof(uchar4) * n, cudaMemcpyHostToDevice));
 
     {
-        uchar4* tmp_centers;
+        float4* tmp_centers;
         // значения указанных пикселей.
-        tmp_centers = (uchar4*)malloc(sizeof(uchar4) * n);
+        tmp_centers = (float4*)malloc(sizeof(uchar4) * n);
         for (int i = 0; i < n_classes; i++) {
-            tmp_centers[i] = host_data[start_centers[i].y * w + start_centers[i].x];
+            uchar4 elem = host_data[start_centers[i].y * w + start_centers[i].x];
+            tmp_centers[i] = make_float4(elem.x, elem.y, elem.z, 0.0f);
         }
         // printf("init\n");
         // for (int i = 0; i < n_classes; i++) {
@@ -112,7 +121,7 @@ void launch_k_means(uchar4* host_data, const int w, const int h, const Center* s
         // printf("%d %d %d\n", m.x, m.y, m.z);
         // }
         // printf("\n\n");
-        CSC(cudaMemcpyToSymbol(dev_centers, tmp_centers, sizeof(uchar4) * n));
+        CSC(cudaMemcpy(dev_next_centers, tmp_centers, sizeof(float4) * n, cudaMemcpyHostToDevice));
         free(tmp_centers);
     }
 
@@ -120,7 +129,10 @@ void launch_k_means(uchar4* host_data, const int w, const int h, const Center* s
                        *dev_equal;
     CSC(cudaMalloc(&dev_equal, sizeof(unsigned long long)));
 
-    while (true) {
+    int killme = 5;
+    while (killme--) {
+        CSC(cudaMemcpyToSymbol(dev_centers, dev_next_centers, sizeof(float4) * n_classes, 0, cudaMemcpyDeviceToDevice));
+
         // CSC(cudaMemcpy(host_data, dev_data, sizeof(uchar4) * n, cudaMemcpyDeviceToHost));
         // printf("===\n");
         // for (int x = 0; x < w; x++) {
@@ -139,7 +151,6 @@ void launch_k_means(uchar4* host_data, const int w, const int h, const Center* s
         // }
         // printf("===\n");
 
-        // сравнение предыдущей классификации и текущей
         CSC(cudaMemset(dev_equal, 0, sizeof(unsigned long long)));
         CSC(cudaMemset(dev_cache, 0, sizeof(ulonglong4) * n_classes));
 
@@ -149,11 +160,10 @@ void launch_k_means(uchar4* host_data, const int w, const int h, const Center* s
             dev_equal)));
 
         CSC(cudaMemcpy(&equal, dev_equal, sizeof(unsigned long long), cudaMemcpyDeviceToHost));
+        // printf("equal: %llu\n", equal);
         if (equal == 0) {
             break;
         }
-
-        CSC(cudaMemcpyToSymbol(dev_centers, dev_next_centers, sizeof(uchar4) * n_classes, 0, cudaMemcpyDeviceToDevice));
     }
 
     CSC(cudaFree(dev_equal));
