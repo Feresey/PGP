@@ -17,7 +17,7 @@ int read_image(FILE* f, uchar** out, uint32_t* w, uint32_t* h)
     CHECK(fread(w, sizeof(uint32_t), 1, f), 1);
     CHECK(fread(h, sizeof(uint32_t), 1, f), 1);
     const size_t size = *w * *h;
-    *out = (uint32_t*)malloc(size * 4);
+    *out = (uchar*)malloc(size * 4);
     CHECK(fread(*out, 1, size * 4, f), size * 4);
     return 0;
 }
