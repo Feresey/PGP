@@ -8,8 +8,8 @@
 #define IN_EPS(EQ) (abs(EQ) < EPS)
 
 // да, костыль
-int blocks = 1;
-int threads = 32;
+dim3 blocks = 1;
+dim3 threads = 32;
 
 __device__ __constant__ float4 dev_centers[500];
 
@@ -49,9 +49,10 @@ __device__ float norm(float4 a, float4 b)
 
 // классификация пикселей по текущим центрам групп.
 __global__ void kernel(
-    uchar4* data, int n,
-    float4* new_centers, ulonglong4* cache, int n_classes,
-    unsigned long long* equal)
+    uchar4* data, size_t n,
+    // float4* new_centers, ulonglong4* cache, uint32_t n_classes,
+    // unsigned long long* equal
+)
 {
     int id = blockDim.x * blockIdx.x + threadIdx.x;
     int offset = blockDim.x * gridDim.x;
@@ -61,41 +62,41 @@ __global__ void kernel(
 
         // вычисление новых центров классов
         // суммирование значений пикселей по классам
-        uchar4 elem = data[i];
-        ulonglong4* cache_elem = &cache[elem.w];
-        atomicAdd(&cache_elem->x, elem.x);
-        atomicAdd(&cache_elem->y, elem.y);
-        atomicAdd(&cache_elem->z, elem.z);
-        atomicAdd(&cache_elem->w, 1);
+        // uchar4 elem = data[i];
+        // ulonglong4* cache_elem = &cache[elem.w];
+        // atomicAdd(&cache_elem->x, elem.x);
+        // atomicAdd(&cache_elem->y, elem.y);
+        // atomicAdd(&cache_elem->z, elem.z);
+        // atomicAdd(&cache_elem->w, 1);
     }
 
-    __syncthreads();
-    // присваивание новых значений центров классов.
-    for (int i = id; i < n_classes; i += offset) {
-        ulonglong4 cache_elem = cache[i];
-        float4 elem = make_float4(
-            float(cache_elem.x) / cache_elem.w,
-            float(cache_elem.y) / cache_elem.w,
-            float(cache_elem.z) / cache_elem.w,
-            0.0f);
-        new_centers[i] = elem;
+    // __syncthreads();
+    // // присваивание новых значений центров классов.
+    // for (int i = id; i < n_classes; i += offset) {
+    //     ulonglong4 cache_elem = cache[i];
+    //     float4 elem = make_float4(
+    //         float(cache_elem.x) / cache_elem.w,
+    //         float(cache_elem.y) / cache_elem.w,
+    //         float(cache_elem.z) / cache_elem.w,
+    //         0.0f);
+    //     new_centers[i] = elem;
 
-        // условие сходимости -- центры не изменились
-        float4 old = dev_centers[i];
-        if (norm(old, elem) > EPS) {
-            // printf("%f %f %f <> %f %f %f\n", old.x, old.y, old.z, elem.x, elem.y, elem.z);
-            atomicAdd(equal, 1);
-        }
-    }
+    //     // условие сходимости -- центры не изменились
+    //     float4 old = dev_centers[i];
+    //     if (norm(old, elem) > EPS) {
+    //         // printf("%f %f %f <> %f %f %f\n", old.x, old.y, old.z, elem.x, elem.y, elem.z);
+    //         atomicAdd(equal, 1);
+    //     }
+    // }
 }
 
 typedef struct {
     int x, y;
 } Center;
 
-void launch_k_means(uchar4* host_data, const int w, const int h, const Center* start_centers, const int n_classes)
+void launch_k_means(uchar4* host_data, const size_t w, const size_t h, const Center* start_centers, const uint32_t n_classes)
 {
-    const int n = h * w;
+    const size_t n = h * w;
 
     float4* dev_next_centers;
     uchar4* dev_data;
@@ -111,8 +112,8 @@ void launch_k_means(uchar4* host_data, const int w, const int h, const Center* s
         float4* tmp_centers;
         // значения указанных пикселей.
         tmp_centers = (float4*)malloc(sizeof(uchar4) * n);
-        for (int i = 0; i < n_classes; i++) {
-            uchar4 elem = host_data[start_centers[i].y * w + start_centers[i].x];
+        for (uint32_t i = 0; i < n_classes; i++) {
+            uchar4 elem = host_data[(size_t)start_centers[i].y * w + (size_t)start_centers[i].x];
             tmp_centers[i] = make_float4(elem.x, elem.y, elem.z, 0.0f);
         }
         // printf("init\n");
@@ -129,8 +130,7 @@ void launch_k_means(uchar4* host_data, const int w, const int h, const Center* s
                        *dev_equal;
     CSC(cudaMalloc(&dev_equal, sizeof(unsigned long long)));
 
-    int killme = 5;
-    while (killme--) {
+    while (true) {
         CSC(cudaMemcpyToSymbol(dev_centers, dev_next_centers, sizeof(float4) * n_classes, 0, cudaMemcpyDeviceToDevice));
 
         // CSC(cudaMemcpy(host_data, dev_data, sizeof(uchar4) * n, cudaMemcpyDeviceToHost));
@@ -151,19 +151,20 @@ void launch_k_means(uchar4* host_data, const int w, const int h, const Center* s
         // }
         // printf("===\n");
 
-        CSC(cudaMemset(dev_equal, 0, sizeof(unsigned long long)));
-        CSC(cudaMemset(dev_cache, 0, sizeof(ulonglong4) * n_classes));
+        // CSC(cudaMemset(dev_equal, 0, sizeof(unsigned long long)));
+        // CSC(cudaMemset(dev_cache, 0, sizeof(ulonglong4) * n_classes));
 
         START_KERNEL((kernel<<<blocks, threads>>>(
             dev_data, n,
-            dev_next_centers, dev_cache, n_classes,
-            dev_equal)));
+            // dev_next_centers, dev_cache, n_classes,
+            // dev_equal
+            )));
 
-        CSC(cudaMemcpy(&equal, dev_equal, sizeof(unsigned long long), cudaMemcpyDeviceToHost));
-        // printf("equal: %llu\n", equal);
-        if (equal == 0) {
-            break;
-        }
+        // CSC(cudaMemcpy(&equal, dev_equal, sizeof(unsigned long long), cudaMemcpyDeviceToHost));
+        // // printf("equal: %llu\n", equal);
+        // if (equal == 0) {
+        //     break;
+        // }
     }
 
     CSC(cudaFree(dev_equal));
@@ -190,11 +191,11 @@ int main()
     scanf("%s", input);
     scanf("%s", output);
 
-    int n_classes;
+    uint32_t n_classes;
     Center* centers;
     scanf("%d", &n_classes);
     centers = (Center*)malloc(n_classes * sizeof(Center));
-    for (int i = 0; i < n_classes; i++) {
+    for (uint32_t i = 0; i < n_classes; i++) {
         scanf("%d", &centers[i].x);
         scanf("%d", &centers[i].y);
     }
@@ -207,21 +208,13 @@ int main()
 
     uchar4* data;
     uint32_t w, h;
-    uint32_t err;
-    err = read_image(in, &data, &w, &h);
-    if (err != 0) {
-        printf("ERROR in %s:%d scan image: %d", __FILE__, __LINE__, err);
-        exit(0);
-    }
+    read_image(in, &data, &w, &h);
     fclose(in);
 
     launch_k_means(data, h, w, centers, n_classes);
 
     FILE* out = fopen(output, "wb");
-    err = write_image(out, data, w, h);
-    if (err != 0) {
-        printf("ERROR in %s:%d write image: %d", __FILE__, __LINE__, err);
-    }
+    write_image(out, data, w, h);
     fclose(out);
 
     free(data);

@@ -33,29 +33,21 @@
     fprintf(stderr, "time = %010.6f\n", t)
 #endif // BENCHMARK
 
-#define CHECK(SIZE_EQ, WANT)    \
-    {                           \
-        size_t err = (SIZE_EQ); \
-        if (err != WANT) {      \
-            return err;         \
-        };                      \
-    }
-
 int read_image(FILE* f, uchar4** out, uint32_t* w, uint32_t* h)
 {
-    CHECK(fread(w, sizeof(uint32_t), 1, f), 1);
-    CHECK(fread(h, sizeof(uint32_t), 1, f), 1);
+    fread(w, (size_t)sizeof(uint32_t), 1UL, f);
+    fread(h, (size_t)sizeof(uint32_t), 1UL, f);
     const size_t size = *w * *h;
     *out = (uchar4*)malloc(size * 4);
-    CHECK(fread(*out, sizeof(uchar4), size, f), size);
+    fread(*out, (size_t)sizeof(uchar4), (size_t)size, f);
     return 0;
 }
 
 int write_image(FILE* f, uchar4* data, uint32_t w, uint32_t h)
 {
-    CHECK(fwrite(&w, sizeof(uint32_t), 1, f), 1);
-    CHECK(fwrite(&h, sizeof(uint32_t), 1, f), 1);
-    CHECK(fwrite(data, sizeof(uchar4), w * h, f), w * h);
+    fwrite(&w, (size_t)sizeof(uint32_t), 1UL, f);
+    fwrite(&h, (size_t)sizeof(uint32_t), 1UL, f);
+    fwrite(data, sizeof(uchar4), w * h, f);
     return 0;
 }
 
