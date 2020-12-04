@@ -13,19 +13,29 @@ dim3 threads = 32;
 
 __device__ __constant__ float4 dev_centers[500];
 
+// расстояние между центром и пикселем
 __device__ float distance(const uchar4& a, const float4& b)
 {
     // printf("%f %f %f\n", b.x, b.y, b.z);
-    float x = b.x - a.x,
-          y = b.y - a.y,
-          z = b.z - a.z;
+    float x = b.x - float(a.x),
+          y = b.y - float(a.y),
+          z = b.z - float(a.z);
+    return x * x + y * y + z * z;
+}
+
+// близость двух центров классов
+__device__ float norm(float4 a, float4 b)
+{
+    float x = a.x - b.x,
+          y = a.y - b.y,
+          z = a.z - b.z;
     return x * x + y * y + z * z;
 }
 
 __device__ int calc_best_distance(const uchar4& point, const int n_classes)
 {
-    int best_class = 255;
-    float best_distance = 690420;
+    int best_class = 0;
+    float best_distance = 1e15;
 
     for (int i = 0; i < n_classes; i++) {
         float curr_distance = distance(point, dev_centers[i]);
@@ -39,55 +49,60 @@ __device__ int calc_best_distance(const uchar4& point, const int n_classes)
     return best_class;
 }
 
-__device__ float norm(float4 a, float4 b)
-{
-    float x = a.x - b.x,
-          y = a.y - b.y,
-          z = a.z - b.z;
-    return x * x + y * y + z * z;
-}
-
 // классификация пикселей по текущим центрам групп.
 __global__ void kernel(
     uchar4* data, size_t n,
-    // float4* new_centers, ulonglong4* cache, uint32_t n_classes,
-    // unsigned long long* equal
-)
+    float4* new_centers, ulonglong4* cache, uint32_t n_classes,
+    unsigned long long* equal)
 {
     int id = blockDim.x * blockIdx.x + threadIdx.x;
     int offset = blockDim.x * gridDim.x;
 
-    for (int i = id; i < n; i += offset) {
-        data[i].w = calc_best_distance(data[i], n_classes);
+    for (size_t i = id; i < n; i += offset) {
+        uchar4& elem = data[i];
+        elem.w = calc_best_distance(elem, n_classes);
 
         // вычисление новых центров классов
         // суммирование значений пикселей по классам
-        // uchar4 elem = data[i];
-        // ulonglong4* cache_elem = &cache[elem.w];
-        // atomicAdd(&cache_elem->x, elem.x);
-        // atomicAdd(&cache_elem->y, elem.y);
-        // atomicAdd(&cache_elem->z, elem.z);
-        // atomicAdd(&cache_elem->w, 1);
+        ulonglong4* cache_elem = &cache[elem.w];
+        atomicAdd(&cache_elem->x, elem.x);
+        atomicAdd(&cache_elem->y, elem.y);
+        atomicAdd(&cache_elem->z, elem.z);
+        atomicAdd(&cache_elem->w, 1);
     }
 
-    // __syncthreads();
-    // // присваивание новых значений центров классов.
-    // for (int i = id; i < n_classes; i += offset) {
-    //     ulonglong4 cache_elem = cache[i];
-    //     float4 elem = make_float4(
-    //         float(cache_elem.x) / cache_elem.w,
-    //         float(cache_elem.y) / cache_elem.w,
-    //         float(cache_elem.z) / cache_elem.w,
-    //         0.0f);
-    //     new_centers[i] = elem;
+    __syncthreads();
+    // присваивание новых значений центров классов.
+    for (uint32_t i = id; i < n_classes; i += offset) {
+        ulonglong4 cache_elem = cache[i];
+        float4 elem = make_float4(
+            float(cache_elem.x) / float(cache_elem.w),
+            float(cache_elem.y) / float(cache_elem.w),
+            float(cache_elem.z) / float(cache_elem.w),
+            0.0f);
+        new_centers[i] = elem;
 
-    //     // условие сходимости -- центры не изменились
-    //     float4 old = dev_centers[i];
-    //     if (norm(old, elem) > EPS) {
-    //         // printf("%f %f %f <> %f %f %f\n", old.x, old.y, old.z, elem.x, elem.y, elem.z);
-    //         atomicAdd(equal, 1);
-    //     }
-    // }
+        // условие сходимости -- центры не изменились
+        float4 old = dev_centers[i];
+        if (norm(old, elem) > EPS) {
+            // printf("%f %f %f <> %f %f %f\n", old.x, old.y, old.z, elem.x, elem.y, elem.z);
+            atomicAdd(equal, 1);
+        }
+    }
+}
+
+__global__ void debug(uchar4* data, const size_t n)
+{
+    int id = blockDim.x * blockIdx.x + threadIdx.x;
+    int offset = blockDim.x * gridDim.x;
+
+    for (size_t i = id; i < n; i += offset) {
+        uchar4& p = data[i];
+        float4 pp = dev_centers[p.w];
+        p.x = (unsigned char)pp.x;
+        p.y = (unsigned char)pp.y;
+        p.z = (unsigned char)pp.z;
+    }
 }
 
 typedef struct {
@@ -98,20 +113,23 @@ void launch_k_means(uchar4* host_data, const size_t w, const size_t h, const Cen
 {
     const size_t n = h * w;
 
-    float4* dev_next_centers;
     uchar4* dev_data;
+    // свежевычисленные центры на основе текущего распределения по классам
+    float4* dev_next_centers;
+    // суммируются все пиксели для вычисления центров классов
     ulonglong4* dev_cache;
-
-    CSC(cudaMalloc(&dev_next_centers, sizeof(float4) * n));
-    CSC(cudaMalloc(&dev_cache, sizeof(ulonglong4) * n));
 
     CSC(cudaMalloc(&dev_data, sizeof(uchar4) * n));
     CSC(cudaMemcpy(dev_data, host_data, sizeof(uchar4) * n, cudaMemcpyHostToDevice));
 
+    CSC(cudaMalloc(&dev_next_centers, sizeof(float4) * n_classes));
+    CSC(cudaMalloc(&dev_cache, sizeof(ulonglong4) * n_classes));
+
+    // инициализация центров классов по их координатам
     {
         float4* tmp_centers;
         // значения указанных пикселей.
-        tmp_centers = (float4*)malloc(sizeof(uchar4) * n);
+        tmp_centers = (float4*)malloc(sizeof(uchar4) * n_classes);
         for (uint32_t i = 0; i < n_classes; i++) {
             uchar4 elem = host_data[(size_t)start_centers[i].y * w + (size_t)start_centers[i].x];
             tmp_centers[i] = make_float4(elem.x, elem.y, elem.z, 0.0f);
@@ -122,7 +140,7 @@ void launch_k_means(uchar4* host_data, const size_t w, const size_t h, const Cen
         // printf("%d %d %d\n", m.x, m.y, m.z);
         // }
         // printf("\n\n");
-        CSC(cudaMemcpy(dev_next_centers, tmp_centers, sizeof(float4) * n, cudaMemcpyHostToDevice));
+        CSC(cudaMemcpy(dev_next_centers, tmp_centers, sizeof(float4) * n_classes, cudaMemcpyHostToDevice));
         free(tmp_centers);
     }
 
@@ -151,21 +169,22 @@ void launch_k_means(uchar4* host_data, const size_t w, const size_t h, const Cen
         // }
         // printf("===\n");
 
-        // CSC(cudaMemset(dev_equal, 0, sizeof(unsigned long long)));
-        // CSC(cudaMemset(dev_cache, 0, sizeof(ulonglong4) * n_classes));
+        CSC(cudaMemset(dev_equal, 0, sizeof(unsigned long long)));
+        CSC(cudaMemset(dev_cache, 0, sizeof(ulonglong4) * n_classes));
 
         START_KERNEL((kernel<<<blocks, threads>>>(
             dev_data, n,
-            // dev_next_centers, dev_cache, n_classes,
-            // dev_equal
-            )));
+            dev_next_centers, dev_cache, n_classes,
+            dev_equal)));
 
-        // CSC(cudaMemcpy(&equal, dev_equal, sizeof(unsigned long long), cudaMemcpyDeviceToHost));
-        // // printf("equal: %llu\n", equal);
-        // if (equal == 0) {
-        //     break;
-        // }
+        CSC(cudaMemcpy(&equal, dev_equal, sizeof(unsigned long long), cudaMemcpyDeviceToHost));
+        // printf("equal: %llu\n", equal);
+        if (equal == 0) {
+            break;
+        }
     }
+
+    START_KERNEL((debug<<<blocks, threads>>>(dev_data, n)));
 
     CSC(cudaFree(dev_equal));
     CSC(cudaMemcpy(host_data, dev_data, sizeof(uchar4) * n, cudaMemcpyDeviceToHost));
@@ -186,7 +205,7 @@ int main()
     }
 #endif
 
-    char input[100], output[100];
+    char input[PATH_MAX], output[PATH_MAX];
 
     scanf("%s", input);
     scanf("%s", output);

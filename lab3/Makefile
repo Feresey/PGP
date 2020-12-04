@@ -1,2 +1,8 @@
 all:
-	nvcc -G -arch=sm_35 --std=c++11 -Werror cross-execution-space-call -lm main.cu -o a.out --compiler-options "-Wall -Werror -Wextra -g3  -Wconversion -Wsign-conversion -Wunreachable-code"
+	nvcc \
+		--std=c++14 -Werror cross-execution-space-call \
+		-arch=sm_35 -Wno-deprecated-gpu-targets\
+		-G \
+		--compiler-options "-Wall -Werror -Wextra -g3 -Wconversion -Wsign-conversion -Wunreachable-code" \
+		main.cu -o a.out \
+		-lm
