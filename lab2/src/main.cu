@@ -38,7 +38,7 @@ __device__ int4 int4sub(int4 a, int4 b)
 }
 
 // #define norm(u) (0.299 * float(u.x) + 0.587 * float(u.y) + 0.144 * float(u.z))
-#define norm(u) ((float(u.x) + float(u.y) + float(u.z))/3.0f)
+#define norm(u) ((float(u.x) + float(u.y) + float(u.z)) / 3.0f)
 #define meanless(a, b) __fsqrt_ru(float(a * a) + float(b * b))
 
 __device__ float prewitt(uchar4* z)
@@ -58,7 +58,7 @@ __device__ float prewitt(uchar4* z)
     // float4 res = make_float4(meanless(g_x.x, g_y.x), meanless(g_x.y, g_y.y), meanless(g_x.z, g_y.z), 0.0f);
     // return norm(res);
 
-    return meanless(norm(g_x),norm(g_y));
+    return meanless(norm(g_x), norm(g_y));
 }
 
 __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
@@ -92,6 +92,33 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
             // я хз, второй злоебучий тест меня не пускает
             out[x + y * w] = make_uchar4(res, res, res, 0);
         }
+    }
+}
+
+typedef union
+{
+    char buffer[4];
+    uint32_t num;
+} fucking_c;
+
+void fucking_char_swap(char *pChar1, char *pChar2)
+{
+    char temp = *pChar1;
+    *pChar1 = *pChar2;
+    *pChar2 = temp;
+}
+
+void fucking_swap(fucking_c *num)
+{
+    fucking_char_swap(&num->buffer[0], &num->buffer[3]);
+    fucking_char_swap(&num->buffer[1], &num->buffer[2]);
+}
+
+void fuck_the_world(fucking_c *raw, size_t size)
+{
+    for (size_t i = 0; i < size; ++i)
+    {
+        fucking_swap(&raw[i]);
     }
 }
 
@@ -181,6 +208,11 @@ int main()
         printf("ERROR in %s:%d write image: %d", __FILE__, __LINE__, err);
     }
     fclose(out);
+
+    fuck_the_world((fucking_c*)(data), h * w);
+    for (uint32_t x = 0; x < w*h; ++x) {
+        fprintf(stderr, "%08x ", data[x]);
+    }
 
     CSC(cudaUnbindTexture(tex));
     CSC(cudaFreeArray(arr));
