@@ -1,42 +1,52 @@
 CONVERT_TOOL ?= ../conv/convert
-TEST_TOOL    ?= ../lab2
+TEST_TOOL    ?= ../bin/lab2
 
 TESTS = t1 t2
 
-TESTS_INPUT  = $(addsuffix /in,$(TESTS))
-TESTS_WANT   = $(addsuffix /want,$(TESTS))
-TESTS_RESULT = $(addsuffix /res,$(TESTS))
+INPUT  = $(addsuffix /in,$(TESTS))
+WANT   = $(addsuffix /want,$(TESTS))
+RESULT = $(addsuffix /res,$(TESTS))
 
-TESTS_HEX_INPUT  = $(addsuffix .hex,$(TESTS_INPUT))
-TESTS_HEX_WANT   = $(addsuffix .hex,$(TESTS_WANT))
-TESTS_HEX_RESULT = $(addsuffix .hex,$(TESTS_RESULT))
+HEX_INPUT  = $(addsuffix .hex,$(INPUT))
+HEX_WANT   = $(addsuffix .hex,$(WANT))
+HEX_RESULT = $(addsuffix .hex,$(RESULT))
 
-TESTS_BINARY_INPUT  = $(addsuffix .bin,$(TESTS_INPUT))
-TESTS_BINARY_WANT   = $(addsuffix .bin,$(TESTS_WANT))
-TESTS_BINARY_RESULT = $(addsuffix .bin,$(TESTS_RESULT))
+BINARY_INPUT  = $(addsuffix .bin,$(INPUT))
+BINARY_WANT   = $(addsuffix .bin,$(WANT))
+BINARY_RESULT = $(addsuffix .bin,$(RESULT))
 
-TESTS_IMAGE_INPUT  = $(addsuffix .png,$(TESTS_INPUT))
-TESTS_IMAGE_WANT   = $(addsuffix .png,$(TESTS_WANT))
-TESTS_IMAGE_RESULT = $(addsuffix .png,$(TESTS_RESULT))
+IMAGE_INPUT  = $(addsuffix .png,$(INPUT))
+IMAGE_WANT   = $(addsuffix .png,$(WANT))
+IMAGE_RESULT = $(addsuffix .png,$(RESULT))
 
-BINS   = $(TESTS_BINARY_INPUT) $(TESTS_BINARY_WANT)
-HEXS   = $(TESTS_HEX_INPUT) $(TESTS_HEX_WANT) $(TESTS_HEX_RESULT)
-IMAGES = $(TESTS_IMAGE_INPUT) $(TESTS_IMAGE_WANT) $(TESTS_IMAGE_RESULT)
+BINS   = $(BINARY_INPUT) $(BINARY_WANT)
+HEXS   = $(HEX_INPUT) $(HEX_WANT) $(HEX_RESULT)
+IMAGES = $(IMAGE_INPUT) $(IMAGE_WANT) $(IMAGE_RESULT)
+
+.PHONY: $(BINARY_RESULT)
 
 .PHONY: all clean
-
 all: $(BINS)
-
+	
 clean:
-	-rm $(BINS) $(IMAGES)
+	-rm $(BINS) $(IMAGES) $(HEX_RESULT)
 
-test:
-	@echo $(TESTS_BINARY_RESULT)
+run: $(IMAGES)
 
-%.hex: 
+DIFFS = $(addprefix test-,$(RESULT))
+test: $(DIFFS)
+
+$(DIFFS): test-%/res: %/want.hex %/res.hex
+	-diff $^
+
+$(HEX_RESULT): %.hex: %.bin
+	@$(CONVERT_TOOL) hex -i $^ -o $@ --mode=decode
 
 $(BINS): %.bin: %.hex
-	$(CONVERT_TOOL) hex -i $^ -o $@ --mode=encode
+	@$(CONVERT_TOOL) hex -i $^ -o $@ --mode=encode
 
-$(TESTS_BINARY_RESULT): %/res.bin: %/in.bin
-	echo $@ $^ | $(TEST_TOOL)
+$(IMAGES): %.png: %.bin
+	@$(CONVERT_TOOL) image -i $^ -o $@ --mode=decode
+
+$(BINARY_RESULT): %/res.bin: %/in.bin
+	echo $^ $@ | $(TEST_TOOL)

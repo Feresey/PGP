@@ -17,37 +17,48 @@
 
 texture<uchar4, 2, cudaReadModeElementType> tex;
 
-__device__ float norm(uchar4 u)
+__device__ int4 uchar4sum(uchar4 a, uchar4 b, uchar4 c)
 {
-    return float(u.x + u.y + u.z) / 3.0f;
+    int4 res;
+    res.x = a.x + b.x + c.x;
+    res.y = a.y + b.y + c.y;
+    res.z = a.z + b.z + c.z;
+    res.w = 0;
+    return res;
 }
 
-__device__ float get_i(uchar4 u, const int i)
+__device__ int4 int4sub(int4 a, int4 b)
 {
-    switch (i) {
-    case 0:
-        return u.x;
-    case 1:
-        return u.y;
-    case 2:
-        return u.z;
-    }
-    return u.w;
+    int4 res;
+    res.x = a.x - b.x;
+    res.y = a.y - b.y;
+    res.z = a.z - b.z;
+    res.w = 0;
+    return res;
 }
 
-__device__ void set_i(uchar4* u, const int i, float value)
+// #define norm(u) (0.299 * float(u.x) + 0.587 * float(u.y) + 0.144 * float(u.z))
+#define norm(u) ((float(u.x) + float(u.y) + float(u.z))/3.0f)
+#define meanless(a, b) __fsqrt_ru(float(a * a) + float(b * b))
+
+__device__ float prewitt(uchar4* z)
 {
-    switch (i) {
-    case 0:
-        u->x = value;
-        break;
-    case 1:
-        u->y = value;
-        break;
-    case 2:
-        u->z = value;
-        break;
-    }
+    // g_x = (z[6] + z[7] + z[8]) - (z[0] + z[1] + z[2]);
+    // g_y = (z[2] + z[5] + z[8]) - (z[0] + z[3] + z[6]);
+
+    int4 up = uchar4sum(z[0], z[1], z[2]);
+    int4 down = uchar4sum(z[6], z[7], z[8]);
+
+    int4 right = uchar4sum(z[0], z[3], z[6]);
+    int4 left = uchar4sum(z[2], z[5], z[8]);
+
+    int4 g_x = int4sub(down, up);
+    int4 g_y = int4sub(left, right);
+
+    // float4 res = make_float4(meanless(g_x.x, g_y.x), meanless(g_x.y, g_y.y), meanless(g_x.z, g_y.z), 0.0f);
+    // return norm(res);
+
+    return meanless(norm(g_x),norm(g_y));
 }
 
 __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
@@ -57,9 +68,8 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
     int offsetx = blockDim.x * gridDim.x;
     int offsety = blockDim.y * gridDim.y;
 
-    float z[9];
+    uchar4 z[9];
     int left, right, top, bottom;
-    float g_x, g_y;
     for (int x = idx; x < w; x += offsetx) {
         for (int y = idy; y < h; y += offsety) {
 
@@ -68,24 +78,19 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
             top = (y == 0) ? y : y - 1;
             bottom = (y == (w - 1)) ? y : y + 1;
 
-            for (int i = 0; i < 3; ++i) {
-                z[0] = get_i(tex2D(tex, left, top), i);
-                z[1] = get_i(tex2D(tex, x, top), i);
-                z[2] = get_i(tex2D(tex, right, top), i);
-                z[3] = get_i(tex2D(tex, left, y), i);
-                z[4] = get_i(tex2D(tex, x, y), i);
-                z[5] = get_i(tex2D(tex, right, y), i);
-                z[6] = get_i(tex2D(tex, left, bottom), i);
-                z[7] = get_i(tex2D(tex, x, bottom), i);
-                z[8] = get_i(tex2D(tex, right, bottom), i);
+            z[0] = tex2D(tex, left, top);
+            z[1] = tex2D(tex, x, top);
+            z[2] = tex2D(tex, right, top);
+            z[3] = tex2D(tex, left, y);
+            z[4] = tex2D(tex, x, y);
+            z[5] = tex2D(tex, right, y);
+            z[6] = tex2D(tex, left, bottom);
+            z[7] = tex2D(tex, x, bottom);
+            z[8] = tex2D(tex, right, bottom);
 
-                g_x = (z[6] + z[7] + z[8]) - (z[0] + z[1] + z[2]);
-                g_y = (z[2] + z[5] + z[8]) - (z[0] + z[3] + z[6]);
-
-                float res = __fsqrt_ru((g_x * g_x) + (g_y * g_y));
-                // я хз, второй злоебучий тест меня не пускает
-                set_i(&out[x + y * w], i, res);
-            }
+            float res = prewitt(z);
+            // я хз, второй злоебучий тест меня не пускает
+            out[x + y * w] = make_uchar4(res, res, res, 0);
         }
     }
 }

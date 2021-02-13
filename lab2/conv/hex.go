@@ -68,7 +68,7 @@ func (h *hexTool) encode(r io.Reader, w io.Writer) error {
 			return err
 		}
 
-		binary.LittleEndian.PutUint32(buf, uint32(res))
+		binary.BigEndian.PutUint32(buf, uint32(res))
 		if _, err := w.Write(buf); err != nil {
 			return err
 		}
@@ -84,12 +84,12 @@ func (h *hexTool) decode(r io.Reader, w io.Writer) error {
 	width := binary.BigEndian.Uint32(header[:4])
 	height := binary.BigEndian.Uint32(header[4:])
 
-	if _, err := fmt.Fprintf(w, "%08x %08x\n", width, height); err != nil {
+	if _, err := fmt.Fprintf(w, "%08X %08X\n", width, height); err != nil {
 		return err
 	}
 
 	var currWidth uint32
-
+	width = binary.LittleEndian.Uint32(header[:4])
 	buf := make([]byte, 4)
 	for {
 		n, err := r.Read(buf)
@@ -110,8 +110,8 @@ func (h *hexTool) decode(r io.Reader, w io.Writer) error {
 		} else {
 			tail = " "
 		}
-		num := binary.LittleEndian.Uint32(buf)
-		if _, err := fmt.Fprintf(w, "%08x"+tail, num); err != nil {
+		num := binary.BigEndian.Uint32(buf)
+		if _, err := fmt.Fprintf(w, "%08X"+tail, num); err != nil {
 			return err
 		}
 	}
