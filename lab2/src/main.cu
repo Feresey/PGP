@@ -1,5 +1,5 @@
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "serialize.h"
@@ -19,7 +19,35 @@ texture<uchar4, 2, cudaReadModeElementType> tex;
 
 __device__ float norm(uchar4 u)
 {
-    return float(u.x+u.y+u.z)/3.0;
+    return float(u.x + u.y + u.z) / 3.0f;
+}
+
+__device__ float get_i(uchar4 u, const int i)
+{
+    switch (i) {
+    case 0:
+        return u.x;
+    case 1:
+        return u.y;
+    case 2:
+        return u.z;
+    }
+    return u.w;
+}
+
+__device__ void set_i(uchar4* u, const int i, float value)
+{
+    switch (i) {
+    case 0:
+        u->x = value;
+        break;
+    case 1:
+        u->y = value;
+        break;
+    case 2:
+        u->z = value;
+        break;
+    }
 }
 
 __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
@@ -40,31 +68,36 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
             top = (y == 0) ? y : y - 1;
             bottom = (y == (w - 1)) ? y : y + 1;
 
-            z[0] = norm(tex2D(tex, left, top));
-            z[1] = norm(tex2D(tex, x, top));
-            z[2] = norm(tex2D(tex, right, top));
+            for (int i = 0; i < 3; ++i) {
+                z[0] = get_i(tex2D(tex, left, top), i);
+                z[1] = get_i(tex2D(tex, x, top), i);
+                z[2] = get_i(tex2D(tex, right, top), i);
+                z[3] = get_i(tex2D(tex, left, y), i);
+                z[4] = get_i(tex2D(tex, x, y), i);
+                z[5] = get_i(tex2D(tex, right, y), i);
+                z[6] = get_i(tex2D(tex, left, bottom), i);
+                z[7] = get_i(tex2D(tex, x, bottom), i);
+                z[8] = get_i(tex2D(tex, right, bottom), i);
 
-            z[3] = norm(tex2D(tex, left, y));
-            z[4] = norm(tex2D(tex, x, y));
-            z[5] = norm(tex2D(tex, right, y));
+                g_x = (z[6] + z[7] + z[8]) - (z[0] + z[1] + z[2]);
+                g_y = (z[2] + z[5] + z[8]) - (z[0] + z[3] + z[6]);
 
-            z[6] = norm(tex2D(tex, left, bottom));
-            z[7] = norm(tex2D(tex, x, bottom));
-            z[8] = norm(tex2D(tex, right, bottom));
-
-            g_x = (z[6] + z[7] + z[8]) - (z[0] + z[1] + z[2]);
-            g_y = (z[2] + z[5] + z[8]) - (z[0] + z[3] + z[6]);
-
-            unsigned char res = (unsigned char)(__fsqrt_ru((g_x * g_x) + (g_y * g_y)));
-            out[x + y * w] = make_uchar4(res, res, res, 255);
+                float res = __fsqrt_ru((g_x * g_x) + (g_y * g_y));
+                // я хз, второй злоебучий тест меня не пускает
+                set_i(&out[x + y * w], i, res);
+            }
         }
     }
 }
 
+#ifdef BENCHMARK
 int main(int argc, char** argv)
+#else
+int main()
+#endif
 {
-    int blocks = 1;
-    int threads = 8;
+    unsigned int blocks = 1;
+    unsigned int threads = 8;
 #ifdef BENCHMARK
     for (int i = 1; i < argc; i += 2) {
         if (strcmp(argv[i], "-blocks") == 0) {
@@ -75,20 +108,21 @@ int main(int argc, char** argv)
     }
 #endif
 
-    char input[100], output[200];
+    char input[255], output[255];
 
     scanf("%s", input);
     scanf("%s", output);
 
     FILE* in = fopen(input, "rb");
-    if (ferror(in)) {
+    if (in == NULL || ferror(in)) {
+        perror(NULL);
         printf("ERROR opening input file: %s\n", input);
         exit(0);
     }
 
     uint32_t* data;
     uint32_t w, h;
-    uint32_t err;
+    int err;
     err = read_image(in, &data, &w, &h);
     if (err != 0) {
         printf("ERROR in %s:%d scan image: %d", __FILE__, __LINE__, err);

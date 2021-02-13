@@ -129,7 +129,7 @@ void launch_k_means(uchar4* host_data, const size_t w, const size_t h, const Cen
     {
         float4* tmp_centers;
         // значения указанных пикселей.
-        tmp_centers = (float4*)malloc(sizeof(uchar4) * n_classes);
+        tmp_centers = (float4*)malloc(sizeof(float4) * n_classes);
         for (uint32_t i = 0; i < n_classes; i++) {
             uchar4 elem = host_data[(size_t)start_centers[i].y * w + (size_t)start_centers[i].x];
             tmp_centers[i] = make_float4(elem.x, elem.y, elem.z, 0.0f);
@@ -184,7 +184,7 @@ void launch_k_means(uchar4* host_data, const size_t w, const size_t h, const Cen
         }
     }
 
-    START_KERNEL((debug<<<blocks, threads>>>(dev_data, n)));
+    // START_KERNEL((debug<<<blocks, threads>>>(dev_data, n)));
 
     CSC(cudaFree(dev_equal));
     CSC(cudaMemcpy(host_data, dev_data, sizeof(uchar4) * n, cudaMemcpyDeviceToHost));
@@ -237,5 +237,6 @@ int main()
     fclose(out);
 
     free(data);
+    free(centers);
     return 0;
 }
