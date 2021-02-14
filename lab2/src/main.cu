@@ -37,15 +37,11 @@ __device__ int4 int4sub(int4 a, int4 b)
     return res;
 }
 
-// #define norm(u) (0.299 * float(u.x) + 0.587 * float(u.y) + 0.144 * float(u.z))
-#define norm(u) ((float(u.x) + float(u.y) + float(u.z)) / 3.0f)
+#define norm(u) (0.299 * float(u.x) + 0.587 * float(u.y) + 0.114 * float(u.z))
 #define meanless(a, b) sqrtf(float(a * a) + float(b * b))
 
 __device__ float prewitt(uchar4* z)
 {
-    // g_x = (z[6] + z[7] + z[8]) - (z[0] + z[1] + z[2]);
-    // g_y = (z[2] + z[5] + z[8]) - (z[0] + z[3] + z[6]);
-
     int4 up = uchar4sum(z[0], z[1], z[2]);
     int4 down = uchar4sum(z[6], z[7], z[8]);
 
@@ -54,11 +50,6 @@ __device__ float prewitt(uchar4* z)
 
     int4 g_x = int4sub(down, up);
     int4 g_y = int4sub(left, right);
-
-    // printf("g_x=%d %d %d:g_y=%d %d %d\n", g_x.x, g_x.y, g_x.z, g_y.x, g_y.y, g_y.z);
-
-    // float4 res = make_float4(meanless(g_x.x, g_y.x), meanless(g_x.y, g_y.y), meanless(g_x.z, g_y.z), 0.0f);
-    // return norm(res);
 
     return meanless(norm(g_x), norm(g_y));
 }
@@ -90,44 +81,16 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
             z[7] = tex2D(tex, x, bottom);
             z[8] = tex2D(tex, right, bottom);
 
-            // printf("(%d,%d)\n", x, y);
-
             float res = prewitt(z);
+            unsigned char res_byte = res;
             if (res < 0) {
                 printf("ERROR: ты обосрался: %f\n", res);
             }
             if (res > 255) {
-                res = 255;
+                res_byte = 255;
             }
-            // printf("res: %f\n", res);
-            // я хз, второй злоебучий тест меня не пускает
-            out[x + y * w] = make_uchar4(res, res, res, 0);
+            out[x + y * w] = make_uchar4(res_byte, res_byte, res_byte, 0);
         }
-    }
-}
-
-typedef union {
-    char buffer[4];
-    uint32_t num;
-} fucking_c;
-
-void fucking_char_swap(char* pChar1, char* pChar2)
-{
-    char temp = *pChar1;
-    *pChar1 = *pChar2;
-    *pChar2 = temp;
-}
-
-void fucking_swap(fucking_c* num)
-{
-    fucking_char_swap(&num->buffer[0], &num->buffer[3]);
-    fucking_char_swap(&num->buffer[1], &num->buffer[2]);
-}
-
-void fuck_the_world(fucking_c* raw, size_t size)
-{
-    for (size_t i = 0; i < size; ++i) {
-        fucking_swap(&raw[i]);
     }
 }
 
@@ -208,14 +171,6 @@ int main()
 
     fprintf(stderr, "time = %010.6f\n", t);
 #endif
-
-    fuck_the_world((fucking_c*)(data), h * w);
-    for (uint32_t x = 0; x < h; ++x) {
-        for (uint32_t y = 0; y < w; ++y) {
-            fprintf(stderr, "%08x ", data[w * x + y]);
-        }
-    }
-    fprintf(stderr, "\n");
 
     CSC(cudaMemcpy(data, dev_data, sizeof(uchar4) * h * w, cudaMemcpyDeviceToHost));
 
