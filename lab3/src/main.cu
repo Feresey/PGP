@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "helpers.h"
+#include "helpers.cuh"
 
 #define EPS 1e-3
 #define IN_EPS(EQ) (abs(EQ) < EPS)
