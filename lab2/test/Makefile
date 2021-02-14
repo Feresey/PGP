@@ -1,7 +1,7 @@
 CONVERT_TOOL ?= ../conv/convert
 TEST_TOOL    ?= ../bin/lab2
 
-TESTS = t1 t2
+TESTS = t1 t2 t3
 
 INPUT  = $(addsuffix /in,$(TESTS))
 WANT   = $(addsuffix /want,$(TESTS))

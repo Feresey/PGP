@@ -20,9 +20,9 @@ texture<uchar4, 2, cudaReadModeElementType> tex;
 __device__ int4 uchar4sum(uchar4 a, uchar4 b, uchar4 c)
 {
     int4 res;
-    res.x = a.x + b.x + c.x;
-    res.y = a.y + b.y + c.y;
-    res.z = a.z + b.z + c.z;
+    res.x = int(a.x) + int(b.x) + int(c.x);
+    res.y = int(a.y) + int(b.y) + int(c.y);
+    res.z = int(a.z) + int(b.z) + int(c.z);
     res.w = 0;
     return res;
 }
@@ -39,7 +39,7 @@ __device__ int4 int4sub(int4 a, int4 b)
 
 // #define norm(u) (0.299 * float(u.x) + 0.587 * float(u.y) + 0.144 * float(u.z))
 #define norm(u) ((float(u.x) + float(u.y) + float(u.z)) / 3.0f)
-#define meanless(a, b) __fsqrt_ru(float(a * a) + float(b * b))
+#define meanless(a, b) sqrtf(float(a * a) + float(b * b))
 
 __device__ float prewitt(uchar4* z)
 {
@@ -54,6 +54,8 @@ __device__ float prewitt(uchar4* z)
 
     int4 g_x = int4sub(down, up);
     int4 g_y = int4sub(left, right);
+
+    // printf("g_x=%d %d %d:g_y=%d %d %d\n", g_x.x, g_x.y, g_x.z, g_y.x, g_y.y, g_y.z);
 
     // float4 res = make_float4(meanless(g_x.x, g_y.x), meanless(g_x.y, g_y.y), meanless(g_x.z, g_y.z), 0.0f);
     // return norm(res);
@@ -73,10 +75,10 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
     for (int x = idx; x < w; x += offsetx) {
         for (int y = idy; y < h; y += offsety) {
 
-            left = (x == 0) ? x : x - 1;
-            right = (x == (h - 1)) ? x : x + 1;
-            top = (y == 0) ? y : y - 1;
-            bottom = (y == (w - 1)) ? y : y + 1;
+            left = x - 1;
+            right = x + 1;
+            top = y - 1;
+            bottom = y + 1;
 
             z[0] = tex2D(tex, left, top);
             z[1] = tex2D(tex, x, top);
@@ -88,36 +90,43 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
             z[7] = tex2D(tex, x, bottom);
             z[8] = tex2D(tex, right, bottom);
 
+            // printf("(%d,%d)\n", x, y);
+
             float res = prewitt(z);
+            if (res < 0) {
+                printf("ERROR: ты обосрался: %f\n", res);
+            }
+            if (res > 255) {
+                res = 255;
+            }
+            // printf("res: %f\n", res);
             // я хз, второй злоебучий тест меня не пускает
             out[x + y * w] = make_uchar4(res, res, res, 0);
         }
     }
 }
 
-typedef union
-{
+typedef union {
     char buffer[4];
     uint32_t num;
 } fucking_c;
 
-void fucking_char_swap(char *pChar1, char *pChar2)
+void fucking_char_swap(char* pChar1, char* pChar2)
 {
     char temp = *pChar1;
     *pChar1 = *pChar2;
     *pChar2 = temp;
 }
 
-void fucking_swap(fucking_c *num)
+void fucking_swap(fucking_c* num)
 {
     fucking_char_swap(&num->buffer[0], &num->buffer[3]);
     fucking_char_swap(&num->buffer[1], &num->buffer[2]);
 }
 
-void fuck_the_world(fucking_c *raw, size_t size)
+void fuck_the_world(fucking_c* raw, size_t size)
 {
-    for (size_t i = 0; i < size; ++i)
-    {
+    for (size_t i = 0; i < size; ++i) {
         fucking_swap(&raw[i]);
     }
 }
@@ -200,6 +209,14 @@ int main()
     fprintf(stderr, "time = %010.6f\n", t);
 #endif
 
+    fuck_the_world((fucking_c*)(data), h * w);
+    for (uint32_t x = 0; x < h; ++x) {
+        for (uint32_t y = 0; y < w; ++y) {
+            fprintf(stderr, "%08x ", data[w * x + y]);
+        }
+    }
+    fprintf(stderr, "\n");
+
     CSC(cudaMemcpy(data, dev_data, sizeof(uchar4) * h * w, cudaMemcpyDeviceToHost));
 
     FILE* out = fopen(output, "wb");
@@ -208,11 +225,6 @@ int main()
         printf("ERROR in %s:%d write image: %d", __FILE__, __LINE__, err);
     }
     fclose(out);
-
-    fuck_the_world((fucking_c*)(data), h * w);
-    for (uint32_t x = 0; x < w*h; ++x) {
-        fprintf(stderr, "%08x ", data[x]);
-    }
 
     CSC(cudaUnbindTexture(tex));
     CSC(cudaFreeArray(arr));
