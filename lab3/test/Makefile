@@ -1,27 +1,20 @@
-CONVERT_TOOL ?= ../conv/convert
-TEST_TOOL    ?= ../bin/lab2
+CONVERT_TOOL ?= ../../conv/convert
+TEST_TOOL    ?= ../bin/lab3
 
-TESTS = t1 t2 t3 t4
+TESTS = t1 t2
 
 INPUT  = $(addsuffix /in,$(TESTS))
-WANT   = $(addsuffix /want,$(TESTS))
 RESULT = $(addsuffix /res,$(TESTS))
+STDIN  = $(addsuffix /stdin,$(TESTS))
 
 HEX_INPUT  = $(addsuffix .hex,$(INPUT))
-HEX_WANT   = $(addsuffix .hex,$(WANT))
 HEX_RESULT = $(addsuffix .hex,$(RESULT))
 
 BINARY_INPUT  = $(addsuffix .bin,$(INPUT))
-BINARY_WANT   = $(addsuffix .bin,$(WANT))
 BINARY_RESULT = $(addsuffix .bin,$(RESULT))
 
-IMAGE_INPUT  = $(addsuffix .png,$(INPUT))
-IMAGE_WANT   = $(addsuffix .png,$(WANT))
-IMAGE_RESULT = $(addsuffix .png,$(RESULT))
-
-BINS   = $(BINARY_INPUT) $(BINARY_WANT)
-HEXS   = $(HEX_INPUT) $(HEX_WANT) $(HEX_RESULT)
-IMAGES = $(IMAGE_INPUT) $(IMAGE_WANT) $(IMAGE_RESULT)
+BINS   = $(BINARY_INPUT)
+HEXS   = $(HEX_INPUT) $(HEX_RESULT)
 
 .PHONY: $(BINARY_RESULT)
 
@@ -29,14 +22,12 @@ IMAGES = $(IMAGE_INPUT) $(IMAGE_WANT) $(IMAGE_RESULT)
 all: $(BINS)
 	
 clean:
-	-rm $(BINS) $(IMAGES) $(HEX_RESULT)
-
-run: $(IMAGES)
+	-rm $(BINS) $(HEX_RESULT)
 
 DIFFS = $(addprefix test-,$(RESULT))
 test: $(DIFFS)
 
-$(DIFFS): test-%/res: %/want.hex %/res.hex
+$(DIFFS): test-%/res: %/in.hex %/res.hex
 	-diff $^
 
 $(HEX_RESULT): %.hex: %.bin
@@ -45,8 +36,8 @@ $(HEX_RESULT): %.hex: %.bin
 $(BINS): %.bin: %.hex
 	@$(CONVERT_TOOL) hex -i $^ -o $@ --mode=encode
 
-$(IMAGES): %.png: %.bin
-	@$(CONVERT_TOOL) image -i $^ -o $@ --mode=decode
+# $(IMAGES): %.png: %.bin
+# 	@$(CONVERT_TOOL) image -i $^ -o $@ --mode=decode
 
 $(BINARY_RESULT): %/res.bin: %/in.bin
-	echo $^ $@ | $(TEST_TOOL)
+	cat <(echo $^ $@) $*/in | $(TEST_TOOL)
