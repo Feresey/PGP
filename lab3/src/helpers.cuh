@@ -1,6 +1,9 @@
 #ifndef HELPERS_H
 #define HELPERS_H
 
+#include <stdint.h>
+#include <stdio.h>
+
 #define CSC(k)                                                 \
     do {                                                       \
         cudaError_t call = k;                                  \

@@ -9,7 +9,7 @@ SEND_TARGET_DIR = $(SEND_DIR)/$(TARGET)
 
 CC = nvcc
 
-CFLAGS += --std=c++14 -Werror cross-execution-space-call
+CFLAGS += --std=c++11 -Werror cross-execution-space-call
 CFLAGS += -arch=sm_35 -Wno-deprecated-gpu-targets
 CFLAGS += -Wno-deprecated-declarations
 CFLAGS += -G
@@ -19,8 +19,7 @@ CFLAGS += -I$(SRCDIR)
 LDFLAGS = -lm
 
 CU_SOURCES = main.cu
-C_SOURCES  = serialize.c
-HEADERS    = serialize.h helpers.cuh
+HEADERS    = helpers.cuh
 
 C_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(C_SOURCES)))
 CU_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CU_SOURCES)))
@@ -36,8 +35,8 @@ $(BUILDDIR) $(BINDIR) $(SEND_DIR) $(SEND_TARGET_DIR):
 	mkdir -p $@
 
 .PHONY: test
-test:
-	$(MAKE) -j1 -C test test TEST_TOOL=$(TARGET)
+test: $(TARGET_BIN)
+	$(MAKE) -j1 -C test test TEST_TOOL=$^
 
 .PHONY: send
 send: | $(SEND_DIR) $(SEND_TARGET_DIR)

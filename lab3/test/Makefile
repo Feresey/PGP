@@ -40,4 +40,4 @@ $(BINS): %.bin: %.hex
 # 	@$(CONVERT_TOOL) image -i $^ -o $@ --mode=decode
 
 $(BINARY_RESULT): %/res.bin: %/in.bin
-	cat <(echo $^ $@) $*/in | $(TEST_TOOL)
+	echo $^ $@ $(shell cat $*/stdin) | $(TEST_TOOL)

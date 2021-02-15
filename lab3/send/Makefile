@@ -1,2 +1,2 @@
 all:
-	nvcc -lm main.cu serialize.c -o lab2
+	nvcc -lm main.cu -o lab3
