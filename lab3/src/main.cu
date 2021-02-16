@@ -70,7 +70,7 @@ void launch_k_means(
 
     for (uint32_t i = 0; i < n_clusters; ++i) {
         const Center center = cluster_centers[i];
-        uchar4 center_pixel = pixels[(size_t)center.x + (size_t)center.y * w];
+        uchar4 center_pixel = pixels[(size_t)center.y + (size_t)center.x * h];
         host_centers[i].x = center_pixel.x;
         host_centers[i].y = center_pixel.y;
         host_centers[i].z = center_pixel.z;

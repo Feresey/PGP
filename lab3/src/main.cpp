@@ -1,8 +1,6 @@
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
-
-#include "helpers.cuh"
+#include <string.h>
 
 #define MAX_CLUSTERS 32
 #define EPS 0.01f
@@ -21,6 +19,9 @@ struct left4dead {
 typedef left4dead<uchar> uchar4;
 typedef left4dead<float> float4;
 typedef left4dead<ull> ulonglong4;
+
+// need types above
+#include "helpers.cuh"
 
 float4 make_float4(float x, float y, float z, float w)
 {
@@ -49,9 +50,9 @@ float center_dist(float4 a, float4 b)
 void calc_distances(uchar4* pixels, size_t n_pixels, uint32_t n_clusters)
 {
     for (size_t i = 0; i < n_pixels; ++i) {
-        int nearest_cluster_index = 0;
+        uchar nearest_cluster_index = 0;
         float min_dist = pixel_dist(pixels[i], dev_centers[0]);
-        for (int j = 1; j < n_clusters; ++j) {
+        for (uchar j = 1; j < n_clusters; ++j) {
             float temp_dist = pixel_dist(pixels[i], dev_centers[j]);
             if (temp_dist < min_dist) {
                 nearest_cluster_index = j;
@@ -77,11 +78,13 @@ void launch_k_means(
 
     for (uint32_t i = 0; i < n_clusters; ++i) {
         const Center center = cluster_centers[i];
-        uchar4 center_pixel = pixels[(size_t)center.x + (size_t)center.y * w];
+        uchar4 center_pixel = pixels[(size_t)center.y + (size_t)center.x * h];
         host_centers[i].x = center_pixel.x;
         host_centers[i].y = center_pixel.y;
         host_centers[i].z = center_pixel.z;
         host_centers[i].w = 0.0f;
+
+        printf("%d: %d %d %d\n", i, center_pixel.x, center_pixel.y, center_pixel.z);
     }
 
     while (true) {
@@ -115,6 +118,13 @@ void launch_k_means(
 
             host_centers[i] = temp;
         }
+
+        // for (size_t i = 0; i < n_pixels; ++i) {
+        //     const uchar4 pixel = pixels[i];
+        //     const float4 cluster = host_centers[pixel.w];
+        //     printf("%lu %d %d %d %d %d %d %d\n", i, pixel.x, pixel.y, pixel.z, pixel.w, uchar(cluster.x), uchar(cluster.y), uchar(cluster.z));
+        // }
+        // printf("===\n");
 
         if (in_eps) {
             break;

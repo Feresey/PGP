@@ -7,23 +7,32 @@ TARGET = lab3
 TARGET_BIN = $(BINDIR)/$(TARGET)
 SEND_TARGET_DIR = $(SEND_DIR)/$(TARGET)
 
-CC = nvcc
+CXX = nvcc
 
 CFLAGS += --std=c++11 -Werror cross-execution-space-call
 CFLAGS += -arch=sm_35 -Wno-deprecated-gpu-targets
 CFLAGS += -Wno-deprecated-declarations
 CFLAGS += -G
 CFLAGS += --compiler-options "-Wall -Werror -Wextra -g3 -Wconversion -Wsign-conversion -Wunreachable-code"
-CFLAGS += -I$(SRCDIR)
 
 LDFLAGS = -lm
 
 CU_SOURCES = main.cu
+CPP_SOURCES = main.cpp
 HEADERS    = helpers.cuh
 
-C_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(C_SOURCES)))
+CPP_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CPP_SOURCES)))
 CU_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CU_SOURCES)))
-OBJECTS = $(C_OBJECTS) $(CU_OBJECTS)
+
+ifeq ($(CUDA),off)
+CXX = g++
+CFLAGS = -Wall -Werror -Wextra -g3 -Wconversion -Wsign-conversion -Wunreachable-code
+OBJECTS = $(CPP_OBJECTS)
+else
+OBJECTS = $(CU_OBJECTS)
+endif
+
+CFLAGS += -I$(SRCDIR)
 
 .PHONY: all clean
 all: $(TARGET)
@@ -49,14 +58,14 @@ send: | $(SEND_DIR) $(SEND_TARGET_DIR)
 $(TARGET): $(TARGET_BIN)
 
 $(TARGET_BIN): $(OBJECTS) | $(BINDIR)
-	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+	$(CXX) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 define compile
-	$(CC) $(CFLAGS) -c $^ -o $@
+	$(CXX) $(CFLAGS) -c $^ -o $@
 endef
 
 $(CU_OBJECTS): $(BUILDDIR)/%.cu.o: $(SRCDIR)/%.cu | $(BUILDDIR)
 	$(compile)
 
-$(C_OBJECTS): $(BUILDDIR)/%.c.o: $(SRCDIR)/%.c | $(BUILDDIR)
+$(CPP_OBJECTS): $(BUILDDIR)/%.cpp.o: $(SRCDIR)/%.cpp | $(BUILDDIR)
 	$(compile)
