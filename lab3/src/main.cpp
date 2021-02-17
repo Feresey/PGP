@@ -68,26 +68,43 @@ typedef struct {
 } Center;
 
 void launch_k_means(
+    char* testname,
     uchar4* pixels, const size_t w, const size_t h,
     const Center* cluster_centers, const uint32_t n_clusters)
 {
-    const size_t n_pixels = h * w;
+    const size_t n_pixels = w * h;
 
     ulonglong4 color_by_cluster_idx[MAX_CLUSTERS];
     float4 host_centers[MAX_CLUSTERS];
 
     for (uint32_t i = 0; i < n_clusters; ++i) {
         const Center center = cluster_centers[i];
-        uchar4 center_pixel = pixels[(size_t)center.y + (size_t)center.x * h];
+        const size_t pos = (size_t)center.y * w + (size_t)center.x;
+        uchar4 center_pixel = pixels[pos];
         host_centers[i].x = center_pixel.x;
         host_centers[i].y = center_pixel.y;
         host_centers[i].z = center_pixel.z;
         host_centers[i].w = 0.0f;
 
-        printf("%d: %d %d %d\n", i, center_pixel.x, center_pixel.y, center_pixel.z);
+        printf("%d: (x=%d, y=%d, pos=%ld) %02x%02x%02x\n",
+            i,
+            center.x, center.y, pos,
+            center_pixel.x, center_pixel.y, center_pixel.z);
     }
 
-    while (true) {
+    int iter = 0;
+    while (++iter) {
+
+        char outname[256];
+        sprintf(outname, "%s.%d.points", testname, iter);
+        FILE* out = fopen(outname, "w");
+        for (size_t i = 0; i < n_pixels; ++i) {
+            const uchar4 pixel = pixels[i];
+            const float4 cluster = host_centers[pixel.w];
+            fprintf(out, "%lu %d %d %d %d %d %d %d\n", i, pixel.x, pixel.y, pixel.z, pixel.w, uchar(cluster.x), uchar(cluster.y), uchar(cluster.z));
+        }
+        fclose(out);
+
         memcpy(dev_centers, host_centers, sizeof(float4) * n_clusters);
         calc_distances(pixels, n_pixels, n_clusters);
 
@@ -118,13 +135,6 @@ void launch_k_means(
 
             host_centers[i] = temp;
         }
-
-        // for (size_t i = 0; i < n_pixels; ++i) {
-        //     const uchar4 pixel = pixels[i];
-        //     const float4 cluster = host_centers[pixel.w];
-        //     printf("%lu %d %d %d %d %d %d %d\n", i, pixel.x, pixel.y, pixel.z, pixel.w, uchar(cluster.x), uchar(cluster.y), uchar(cluster.z));
-        // }
-        // printf("===\n");
 
         if (in_eps) {
             break;
@@ -163,7 +173,7 @@ int main()
     read_image(in, &data, &w, &h);
     fclose(in);
 
-    launch_k_means(data, h, w, centers, n_clusters);
+    launch_k_means(input, data, w, h, centers, n_clusters);
 
     FILE* out = fopen(output, "wb");
     if (out == NULL || ferror(out)) {

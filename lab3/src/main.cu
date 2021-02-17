@@ -70,7 +70,7 @@ void launch_k_means(
 
     for (uint32_t i = 0; i < n_clusters; ++i) {
         const Center center = cluster_centers[i];
-        uchar4 center_pixel = pixels[(size_t)center.y + (size_t)center.x * h];
+        uchar4 center_pixel = pixels[(size_t)center.y * w + (size_t)center.x];
         host_centers[i].x = center_pixel.x;
         host_centers[i].y = center_pixel.y;
         host_centers[i].z = center_pixel.z;
@@ -151,7 +151,15 @@ int main()
     read_image(in, &data, &w, &h);
     fclose(in);
 
-    launch_k_means(data, h, w, centers, n_clusters);
+    for (size_t y = 0; y < h; ++y) {
+        for (size_t x = 0; x < w; ++x) {
+            uchar4 p = pixels[y * w + x];
+            fprintf(stderr, "%02x%02x%02x%02x ", p.x, p.y, p.z, p.w);
+        }
+        fprintf(stderr, "\n");
+    }
+
+    launch_k_means(data, w, h, centers, n_clusters);
 
     FILE* out = fopen(output, "wb");
     if (out == NULL || ferror(out)) {
