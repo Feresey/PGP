@@ -151,14 +151,6 @@ int main()
     read_image(in, &data, &w, &h);
     fclose(in);
 
-    for (size_t y = 0; y < h; ++y) {
-        for (size_t x = 0; x < w; ++x) {
-            uchar4 p = pixels[y * w + x];
-            fprintf(stderr, "%02x%02x%02x%02x ", p.x, p.y, p.z, p.w);
-        }
-        fprintf(stderr, "\n");
-    }
-
     launch_k_means(data, w, h, centers, n_clusters);
 
     FILE* out = fopen(output, "wb");
