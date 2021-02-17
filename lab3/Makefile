@@ -3,6 +3,11 @@ BUILDDIR = $(CURDIR)/build
 BINDIR   = $(CURDIR)/bin
 SEND_DIR = $(CURDIR)/send
 
+CONVERT_TOOL = $(CURDIR)/../conv/convert
+
+$(CONVERT_TOOL):
+	cd $(dir $@) && go build -v
+
 TARGET = lab3
 TARGET_BIN = $(BINDIR)/$(TARGET)
 SEND_TARGET_DIR = $(SEND_DIR)/$(TARGET)
@@ -44,7 +49,7 @@ $(BUILDDIR) $(BINDIR) $(SEND_DIR) $(SEND_TARGET_DIR):
 	mkdir -p $@
 
 .PHONY: test
-test: $(TARGET_BIN)
+test: $(TARGET_BIN) | $(CONVERT_TOOL)
 	$(MAKE) -j1 -C test test TEST_TOOL=$^
 
 .PHONY: send
@@ -69,3 +74,5 @@ $(CU_OBJECTS): $(BUILDDIR)/%.cu.o: $(SRCDIR)/%.cu | $(BUILDDIR)
 
 $(CPP_OBJECTS): $(BUILDDIR)/%.cpp.o: $(SRCDIR)/%.cpp | $(BUILDDIR)
 	$(compile)
+
+
