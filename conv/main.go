@@ -29,7 +29,7 @@ func New() *cobra.Command {
 	}
 	c.flags(cmd, nil)
 
-	cmd.AddCommand(c.imageCommand(), c.hexCommand())
+	cmd.AddCommand(c.imageCommand(), c.hexCommand(), c.pixelsCommand())
 
 	return cmd
 }
@@ -52,6 +52,13 @@ func (c *command) hexCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:  "hex",
 		RunE: newHexTool(c).RunE,
+	}
+}
+
+func (c *command) pixelsCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:  "pixels",
+		RunE: newPixelsTool(c).RunE,
 	}
 }
 
