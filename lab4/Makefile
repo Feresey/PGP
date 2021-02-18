@@ -14,17 +14,17 @@ SEND_TARGET_DIR = $(SEND_DIR)/$(TARGET)
 
 CXX = nvcc
 
-CFLAGS += --std=c++11 -Werror cross-execution-space-call
+CFLAGS += --std=c++14 -Werror cross-execution-space-call
 CFLAGS += -arch=sm_35 -Wno-deprecated-gpu-targets
 CFLAGS += -Wno-deprecated-declarations
 CFLAGS += -G
-CFLAGS += --compiler-options "-Wall -Werror -Wextra -g3 -Wconversion -Wsign-conversion -Wunreachable-code"
+CFLAGS += --compiler-options "-Wall -Wextra -g3 -Wunreachable-code -Wno-unused-parameter"
 
 LDFLAGS = -lm
 
-CU_SOURCES  = main.cu
+CU_SOURCES  = main.cu kernels.cu solve.cu matrix.cu
 CPP_SOURCES = main.cpp
-HEADERS     = helpers.h
+HEADERS     = helpers.cuh kernels.cuh solve.cuh
 
 CPP_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CPP_SOURCES)))
 CU_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CU_SOURCES)))
