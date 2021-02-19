@@ -8,43 +8,16 @@ struct comparator {
     }
 };
 
-dev_matrix inverse(const dev_matrix& matrix, const int n, const int m)
+dev_matrix solve(const dev_matrix& A, const dev_matrix& B, const int n, const int m, const int k)
 {
-    dev_matrix joined = dev_matrix(n * 2 * m);
-    double* joined_raw = thrust::raw_pointer_cast(&joined[0]);
-    const double* matrix_raw = thrust::raw_pointer_cast(&matrix[0]);
-    START_KERNEL((make_joined<<<BLOCKS, THREADS>>>(joined_raw, matrix_raw, n, m)));
+    const double* B_raw = thrust::raw_pointer_cast(&B[0]);
+    dev_matrix B_trans(k * n);
+    double* B_trans_raw = thrust::raw_pointer_cast(&B_trans[0]);
+    START_KERNEL((transponse<<<BLOCKS, THREADS>>>(B_trans_raw, B_raw, n, k)));
 
-    show_matrix(stdout, joined, n * 2, m);
+    show_matrix(stderr, B, n, k);
+    show_matrix(stderr, B_trans, k, n);
 
-    double prod = 1;
-
-    comparator comp;
-    for (int i = 0; i < n - 1; ++i) {
-        // поиск максимального элемента в столбце
-        // он гарантированно не нулевой, т.к. матрица не вырожденная
-        dev_matrix::iterator iter = joined.begin() + i * n * 2;
-        dev_matrix::iterator i_max = thrust::max_element(iter + i, iter + n, comp);
-
-        int mx = iter - i_max;
-        if (mx != i) {
-            START_KERNEL((swapRows<<<BLOCKS, THREADS>>>(joined_raw, n * 2, i, mx)));
-        }
-
-        START_KERNEL((divide<<<BLOCKS, THREADS>>>(joined_raw, n, i)));
-        prod /= *i_max;
-
-        // kernel<<<dim3(32, 32), dim3(32, 32)>>>(data, n, i);
-    }
-
-    dev_matrix res = dev_matrix(n * m);
-    double* res_raw = thrust::raw_pointer_cast(&res[0]);
-    START_KERNEL((split_joined<<<BLOCKS, THREADS>>>(res_raw, joined_raw, n, m)));
-
+    dev_matrix res(m * k);
     return res;
-}
-
-dev_matrix solve(host_matrix A, host_matrix B, const int n, const int m, const int k)
-{
-    return inverse(A, n, m);
 }

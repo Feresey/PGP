@@ -42,8 +42,8 @@
 typedef thrust::host_vector<double> host_matrix;
 typedef thrust::device_vector<double> dev_matrix;
 
-#define BLOCKS dim3(8)
-#define THREADS dim3(8)
+#define BLOCKS dim3(8, 8)
+#define THREADS dim3(8, 8)
 
 void read_matrix(host_matrix& out, const int n, const int m);
 void show_matrix(FILE* out, const host_matrix& data, const int n, const int m);
