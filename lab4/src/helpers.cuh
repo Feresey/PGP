@@ -1,5 +1,5 @@
-#ifndef HELPERS_H
-#define HELPERS_H
+#ifndef HELPERS_CUH
+#define HELPERS_CUH
 
 #include <stdint.h>
 #include <stdio.h>
@@ -36,6 +36,7 @@
     fprintf(stderr, "time = %010.6f\n", t)
 #endif // BENCHMARK
 
+#ifdef __NVCC__
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 
@@ -44,8 +45,14 @@ typedef thrust::device_vector<double> dev_matrix;
 
 #define BLOCKS dim3(8, 8)
 #define THREADS dim3(8, 8)
+#else
+#include "helpers.hpp"
+#endif
 
-void read_matrix(host_matrix& out, const int n, const int m);
-void show_matrix(FILE* out, const host_matrix& data, const int n, const int m);
+void read_matrix(host_matrix& out, const size_t n, const size_t m);
+void show_matrix(FILE* out, const host_matrix& data, const size_t n, const size_t m);
+
+dev_matrix inverse(const dev_matrix& matrix, const size_t n, const size_t m);
+dev_matrix solve(const dev_matrix& A, const dev_matrix& B, const size_t n, const size_t m, const size_t k);
 
 #endif // HELPERS_H

@@ -3,8 +3,6 @@ BUILDDIR = $(CURDIR)/build
 BINDIR   = $(CURDIR)/bin
 SEND_DIR = $(CURDIR)/send
 
-CONVERT_TOOL = $(CURDIR)/../conv/convert
-
 $(CONVERT_TOOL):
 	cd $(dir $@) && go build -v
 
@@ -22,16 +20,16 @@ CFLAGS += --compiler-options "-Wall -Wextra -g3 -Wunreachable-code -Wno-unused-p
 
 LDFLAGS = -lm
 
-CU_SOURCES  = main.cu kernels.cu solve.cu matrix.cu
-CPP_SOURCES = main.cpp
-HEADERS     = helpers.cuh kernels.cuh solve.cuh
+CU_SOURCES  = main.cu kernels.cu solve.cu helpers.cu
+CPP_SOURCES = main.cpp solve.cpp helpers.cpp
+HEADERS     = helpers.cuh kernels.cu
 
 CPP_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CPP_SOURCES)))
 CU_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CU_SOURCES)))
 
 ifeq ($(CUDA),off)
 CXX = g++
-CFLAGS = -Wall -Werror -Wextra -g3 -Wconversion -Wsign-conversion -Wunreachable-code
+CFLAGS = -Wall -Wextra -Wpedantic -g3 -Wconversion -Wsign-conversion -Wunreachable-code
 OBJECTS = $(CPP_OBJECTS)
 else
 OBJECTS = $(CU_OBJECTS)
