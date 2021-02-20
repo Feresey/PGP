@@ -8,7 +8,8 @@
 #define BLOCK_SIZE 1024
 #define WARP_SIZE 32
 
-#define THREAD_INDEX(idx) ((WARP_SIZE + 1) * ((idx) / WARP_SIZE) + ((idx) % WARP_SIZE))
+// #define THREAD_INDEX(idx) (WARP_SIZE * ((idx) / WARP_SIZE) + ((idx) % WARP_SIZE))
+#define THREAD_INDEX(idx) (idx)
 
 #define SWAP_IF(arr, x, y) \
     if (arr[x] > arr[y])   \
@@ -17,7 +18,7 @@
 __global__ void sort_blocks_even_odd(int* dev_arr)
 {
     // хвостик от выравнивания банков
-    __shared__ int shared[BLOCK_SIZE + (BLOCK_SIZE / WARP_SIZE) + 1];
+    __shared__ int shared[THREAD_INDEX(BLOCK_SIZE + 1)];
 
     const unsigned int thread_id = threadIdx.x,
                        block_offset = blockIdx.x * BLOCK_SIZE,
@@ -41,10 +42,10 @@ __global__ void sort_blocks_even_odd(int* dev_arr)
     swap2_idx2 = THREAD_INDEX(swap2_idx2);
 
     for (int i = 0; i < BLOCK_SIZE; ++i) {
+        __syncthreads();
         SWAP_IF(shared, swap1_idx1, swap1_idx2);
         __syncthreads();
         SWAP_IF(shared, swap1_idx2, swap2_idx2);
-        __syncthreads();
     }
 
     __syncthreads();
@@ -53,17 +54,17 @@ __global__ void sort_blocks_even_odd(int* dev_arr)
     dev_arr[thread_id + block_offset + BLOCK_SIZE / 2] = shared[THREAD_INDEX(second_half_idx)];
 }
 
-__global__ void merge(int* dev_arr, int iter, int type)
+__global__ void bitonic_merge(int* dev_arr, int iter, int type)
 {
-    __shared__ int shared[BLOCK_SIZE + (BLOCK_SIZE / WARP_SIZE)];
+    __shared__ int shared[BLOCK_SIZE];
 
     const unsigned int thread_id = threadIdx.x,
                        block_offset = blockIdx.x * BLOCK_SIZE,
                        load_second_half_idx = BLOCK_SIZE - thread_id - 1,
                        store_second_half_idx = thread_id + BLOCK_SIZE / 2;
 
-    shared[THREAD_INDEX(thread_id)] = dev_arr[thread_id + block_offset];
-    shared[THREAD_INDEX(load_second_half_idx)] = dev_arr[thread_id + block_offset + BLOCK_SIZE / 2];
+    shared[thread_id] = dev_arr[thread_id + block_offset];
+    shared[load_second_half_idx] = dev_arr[thread_id + block_offset + BLOCK_SIZE / 2];
 
     __syncthreads();
 
@@ -74,9 +75,6 @@ __global__ void merge(int* dev_arr, int iter, int type)
         int swap_idx1 = 2 * stride * i + j,
             swap_idx2 = 2 * stride * i + j + stride;
 
-        swap_idx1 = THREAD_INDEX(swap_idx1);
-        swap_idx2 = THREAD_INDEX(swap_idx2);
-
         __syncthreads();
 
         SWAP_IF(shared, swap_idx1, swap_idx2);
@@ -84,8 +82,8 @@ __global__ void merge(int* dev_arr, int iter, int type)
 
     __syncthreads();
 
-    dev_arr[thread_id + block_offset] = shared[THREAD_INDEX(thread_id)];
-    dev_arr[thread_id + block_offset + BLOCK_SIZE / 2] = shared[THREAD_INDEX(store_second_half_idx)];
+    dev_arr[thread_id + block_offset] = shared[thread_id];
+    dev_arr[thread_id + block_offset + BLOCK_SIZE / 2] = shared[store_second_half_idx];
 }
 
 __global__ void int_memset(int* dev_arr, const uint32_t n, const int val)
@@ -126,8 +124,8 @@ void block_odd_even_sort(int* arr, int n)
     }
 
     for (int iter = 0; iter < n_blocks; ++iter) {
-        START_KERNEL((merge<<<n_blocks - 1, BLOCK_SIZE / 2>>>(dev_arr + BLOCK_SIZE / 2, iter, 0)));
-        START_KERNEL((merge<<<n_blocks, BLOCK_SIZE / 2>>>(dev_arr, iter, 1)));
+        START_KERNEL((bitonic_merge<<<n_blocks - 1, BLOCK_SIZE / 2>>>(dev_arr + BLOCK_SIZE / 2, iter, 0)));
+        START_KERNEL((bitonic_merge<<<n_blocks, BLOCK_SIZE / 2>>>(dev_arr, iter, 1)));
     }
 
     CSC(cudaMemcpy(arr, dev_arr + (dev_n - n), n * sizeof(int), cudaMemcpyDeviceToHost));

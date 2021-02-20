@@ -1,4 +1,4 @@
-TEST_TOOL ?= ../bin/lab4
+TEST_TOOL ?= ../bin/lab5
 
 TESTS = t1 t2 t3
 
@@ -16,8 +16,8 @@ clean:
 
 .PHONY: $(DIFFS)
 $(DIFFS): test-%: %/want %/res
-	-diff $^
+	-diff -q $^
 
 .PHONY: $(RESULT) # run always
 $(RESULT): %/res: %/in
-	cat $^ | $(TEST_TOOL) > $@
+	cd $* && cat in | $(TEST_TOOL) > res
