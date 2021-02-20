@@ -14,17 +14,9 @@
     if (arr[x] > arr[y])   \
     SWAP(arr, x, y)
 
-__global__ void int_memset(int* dev_arr, int n, int val)
+__global__ void sort_blocks_even_odd(int* dev_arr)
 {
-    int idx = threadIdx.x + blockIdx.x * blockDim.x;
-    int offset = gridDim.x * blockDim.x;
-
-    for (int i = idx; i < n; i += offset)
-        dev_arr[i] = val;
-}
-
-__global__ void sort_blocks(int* dev_arr)
-{
+    // хвостик от выравнивания банков
     __shared__ int shared[BLOCK_SIZE + (BLOCK_SIZE / WARP_SIZE) + 1];
 
     const unsigned int thread_id = threadIdx.x,
@@ -67,7 +59,8 @@ __global__ void merge(int* dev_arr, int iter, int type)
 
     const unsigned int thread_id = threadIdx.x,
                        block_offset = blockIdx.x * BLOCK_SIZE,
-                       load_second_half_idx = BLOCK_SIZE - thread_id - 1;
+                       load_second_half_idx = BLOCK_SIZE - thread_id - 1,
+                       store_second_half_idx = thread_id + BLOCK_SIZE / 2;
 
     shared[THREAD_INDEX(thread_id)] = dev_arr[thread_id + block_offset];
     shared[THREAD_INDEX(load_second_half_idx)] = dev_arr[thread_id + block_offset + BLOCK_SIZE / 2];
@@ -90,10 +83,19 @@ __global__ void merge(int* dev_arr, int iter, int type)
     }
 
     __syncthreads();
-    
+
     dev_arr[thread_id + block_offset] = shared[THREAD_INDEX(thread_id)];
-    int store_second_half_idx = thread_id + BLOCK_SIZE / 2;
     dev_arr[thread_id + block_offset + BLOCK_SIZE / 2] = shared[THREAD_INDEX(store_second_half_idx)];
+}
+
+__global__ void int_memset(int* dev_arr, const uint32_t n, const int val)
+{
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    int offset = gridDim.x * blockDim.x;
+
+    for (int i = idx; i < n; i += offset) {
+        dev_arr[i] = val;
+    }
 }
 
 int nearest_size(int num, int prod)
@@ -115,7 +117,7 @@ void block_odd_even_sort(int* arr, int n)
     // гарантия что элементы, которые получились из за расширения окажутся в начале отсортированного массива
     START_KERNEL((int_memset<<<1, BLOCK_SIZE>>>(dev_arr + n, (dev_n - n), INT_MIN)));
     // подготовка блоков
-    START_KERNEL((sort_blocks<<<n_blocks, BLOCK_SIZE / 2>>>(dev_arr)));
+    START_KERNEL((sort_blocks_even_odd<<<n_blocks, BLOCK_SIZE / 2>>>(dev_arr)));
 
     if (n_blocks == 1) {
         CSC(cudaMemcpy(arr, dev_arr + (dev_n - n), n * sizeof(int), cudaMemcpyDeviceToHost));

@@ -1,6 +1,6 @@
 TEST_TOOL ?= ../bin/lab4
 
-TESTS = t1
+TESTS = t1 t2 t3
 
 INPUT  = $(addsuffix /in,$(TESTS))
 RESULT = $(addsuffix /res,$(TESTS))
