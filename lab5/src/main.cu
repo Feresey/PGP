@@ -1,107 +1,111 @@
-
+#include <byteswap.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 
-/* Every thread gets exactly one value in the unsorted array. */
-#define THREADS 512 // 2^9
-#define BLOCKS 32768 // 2^15
+#include "helpers.cuh"
+
+#define THREADS 8
+#define BLOCKS 8
 #define NUM_VALS THREADS* BLOCKS
 
-void print_elapsed(clock_t start, clock_t stop)
+#define SWAP(a, b)      \
+    do {                \
+        int temp = (a); \
+        (a) = (b);      \
+        (b) = temp;     \
+    } while (false)
+
+uint32_t scan_4()
 {
-    double elapsed = ((double)(stop - start)) / CLOCKS_PER_SEC;
-    printf("Elapsed time: %.3fs\n", elapsed);
+    uint32_t temp;
+    scanf("%x", &temp);
+    return __bswap_32(temp);
 }
 
-float random_float()
+void print_arr(FILE* out, const int* arr, const uint32_t size)
 {
-    return (float)rand() / (float)RAND_MAX;
-}
-
-void array_print(float* arr, int length)
-{
-    int i;
-    for (i = 0; i < length; ++i) {
-        printf("%1.3f ", arr[i]);
+    for (uint32_t i = 0; i < size; ++i) {
+        fprintf(out, "%08x", __bswap_32(arr[i]));
+        if (i != size - 1) {
+            fprintf(out, " ");
+        }
     }
-    printf("\n");
+    fprintf(out, "\n");
 }
 
-void array_fill(float* arr, int length)
+#define BLOCK_SIZE 4
+__global__ void kernel_bitonic_sort(int* arr)
 {
-    srand(time(NULL));
-    int i;
-    for (i = 0; i < length; ++i) {
-        arr[i] = random_float();
+    const uint32_t tid = threadIdx.x;
+    __shared__ int shared[BLOCK_SIZE];
+
+    shared[tid] = arr[tid];
+    __syncthreads();
+
+    for (uint32_t k = 2; k <= BLOCK_SIZE; k *= 2) {
+        for (uint32_t j = k / 2; j > 0; j /= 2) {
+            uint32_t ixj = tid ^ j;
+            if (ixj > tid) {
+                if ((tid & k) == 0) {
+                    if (shared[tid] > shared[ixj]) {
+                        SWAP(shared[tid], shared[ixj]);
+                    }
+                } else {
+                    if (shared[tid] < shared[ixj]) {
+                        SWAP(shared[tid], shared[ixj]);
+                    }
+                }
+            printf("k=%d j=%d tid=%d ixj=%d %d\n", k, j, tid, ixj, ((tid & k) == 0));
+            }
+            __syncthreads();
+        }
     }
+
+    arr[tid] = shared[tid];
 }
 
-__global__ void bitonic_sort_step(float* dev_values, int j, int k)
+void bitonic_sort(int* arr, const uint32_t size)
 {
-    unsigned int i, ixj; /* Sorting partners: i and ixj */
-    i = threadIdx.x + blockDim.x * blockIdx.x;
-    ixj = i ^ j;
+    int* dev_arr;
+    CSC(cudaMalloc(&dev_arr, sizeof(int) * size));
+    CSC(cudaMemcpy(dev_arr, arr, sizeof(int) * size, cudaMemcpyHostToDevice));
+    for (uint32_t block_start = 0; block_start + BLOCK_SIZE < size; block_start += BLOCK_SIZE) {
+        START_KERNEL((kernel_bitonic_sort<<<1, BLOCK_SIZE, sizeof(int) * BLOCK_SIZE>>>(dev_arr + block_start)));
+    }
+    CSC(cudaMemcpy(arr, dev_arr, sizeof(int) * size, cudaMemcpyDeviceToHost));
+    CSC(cudaFree(dev_arr));
+}
 
-    /* The threads with the lowest ids sort the array. */
-    if ((ixj) > i) {
-        if ((i & k) == 0) {
-            /* Sort ascending */
-            if (dev_values[i] > dev_values[ixj]) {
-                /* exchange(i,ixj); */
-                float temp = dev_values[i];
-                dev_values[i] = dev_values[ixj];
-                dev_values[ixj] = temp;
+void odd_even_sorting(int* arr, const uint32_t size)
+{
+    for (size_t i = 0; i < size; i++) {
+        for (size_t j = i & 1; j < size - 1; j += 2) {
+            if (arr[j] > arr[j + 1]) {
+                SWAP(arr[j], arr[j + 1]);
             }
         }
-        if ((i & k) != 0) {
-            /* Sort descending */
-            if (dev_values[i] < dev_values[ixj]) {
-                /* exchange(i,ixj); */
-                float temp = dev_values[i];
-                dev_values[i] = dev_values[ixj];
-                dev_values[ixj] = temp;
-            }
-        }
     }
 }
 
-/**
- * Inplace bitonic sort using CUDA.
- */
-void bitonic_sort(float* values)
+void odd_even(int* arr, const uint32_t size)
 {
-    float* dev_values;
-    size_t size = NUM_VALS * sizeof(float);
-
-    cudaMalloc((void**)&dev_values, size);
-    cudaMemcpy(dev_values, values, size, cudaMemcpyHostToDevice);
-
-    dim3 blocks(BLOCKS, 1); /* Number of blocks   */
-    dim3 threads(THREADS, 1); /* Number of threads  */
-
-    int j, k;
-    /* Major step */
-    for (k = 2; k <= NUM_VALS; k <<= 1) {
-        /* Minor step */
-        for (j = k >> 1; j > 0; j = j >> 1) {
-            bitonic_sort_step<<<blocks, threads>>>(dev_values, j, k);
-        }
-    }
-    cudaMemcpy(values, dev_values, size, cudaMemcpyDeviceToHost);
-    cudaFree(dev_values);
 }
 
-int main(void)
+int main()
 {
-    clock_t start, stop;
+    uint32_t size = scan_4();
 
-    float* values = (float*)malloc(NUM_VALS * sizeof(float));
-    array_fill(values, NUM_VALS);
+    int* arr = (int*)malloc(size * sizeof(int));
+    for (uint32_t i = 0; i < size; ++i) {
+        arr[i] = int(scan_4());
+    }
 
-    start = clock();
-    bitonic_sort(values); /* Inplace */
-    stop = clock();
+    bitonic_sort(arr, size);
+    // odd_even_sorting(arr, size);
 
-    print_elapsed(start, stop);
+    print_arr(stdout, arr, size);
+
+    free(arr);
+    return 0;
 }

@@ -6,7 +6,7 @@ SEND_DIR = $(CURDIR)/send
 $(CONVERT_TOOL):
 	cd $(dir $@) && go build -v
 
-TARGET = lab4
+TARGET = lab5
 TARGET_BIN = $(BINDIR)/$(TARGET)
 SEND_TARGET_DIR = $(SEND_DIR)/$(TARGET)
 
@@ -20,19 +20,21 @@ CFLAGS += --compiler-options "-Wall -Wextra -g3 -Wunreachable-code -Wno-unused-p
 
 LDFLAGS = -lm
 
-CU_SOURCES  = main.cu kernels.cu solve.cu helpers.cu
-CPP_SOURCES = main.cpp solve.cpp helpers.cpp
-HEADERS     = helpers.cuh kernels.cu
+CU_SOURCES  = fuck.cu
+C_SOURCES   = helpers.c
+# CPP_SOURCES = main.cpp solve.cpp helpers.cpp
+HEADERS     = helpers.cuh
 
 CPP_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CPP_SOURCES)))
-CU_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CU_SOURCES)))
+C_OBJECTS   = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(C_SOURCES)))
+CU_OBJECTS  = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CU_SOURCES)))
 
 ifeq ($(CUDA),off)
 CXX = g++
 CFLAGS = -Wall -Wextra -Wpedantic -g3 -Wconversion -Wsign-conversion -Wunreachable-code
 OBJECTS = $(CPP_OBJECTS)
 else
-OBJECTS = $(CU_OBJECTS)
+OBJECTS = $(CU_OBJECTS) $(C_OBJECTS)
 endif
 
 CFLAGS += -I$(SRCDIR)
@@ -71,6 +73,9 @@ $(CU_OBJECTS): $(BUILDDIR)/%.cu.o: $(SRCDIR)/%.cu | $(BUILDDIR)
 	$(compile)
 
 $(CPP_OBJECTS): $(BUILDDIR)/%.cpp.o: $(SRCDIR)/%.cpp | $(BUILDDIR)
+	$(compile)
+
+$(C_OBJECTS): $(BUILDDIR)/%.c.o: $(SRCDIR)/%.c | $(BUILDDIR)
 	$(compile)
 
 
