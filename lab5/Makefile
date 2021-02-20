@@ -50,7 +50,7 @@ $(BUILDDIR) $(BINDIR) $(SEND_DIR) $(SEND_TARGET_DIR):
 
 .PHONY: test
 test: $(TARGET_BIN) | $(CONVERT_TOOL)
-	$(MAKE) -j1 -C test test TEST_TOOL=$^
+	$(MAKE) -j1 -C test TEST_TOOL=$^
 
 .PHONY: send
 send: | $(SEND_DIR) $(SEND_TARGET_DIR)

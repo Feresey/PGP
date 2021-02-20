@@ -8,26 +8,11 @@
 #define BLOCK_SIZE 1024
 #define WARP_SIZE 32
 
-#define idx(ind) \
-    ((WARP_SIZE + 1) * (ind / WARP_SIZE) + (ind % WARP_SIZE))
+#define THREAD_INDEX(idx) ((WARP_SIZE + 1) * ((idx) / WARP_SIZE) + ((idx) % WARP_SIZE))
 
-int next_multiple(int n, int m)
-{
-    int r = n % m;
-    if (r == 0)
-        return n;
-    return n + (m - r);
-}
-
-__device__ void conditional_swap(int* x, int* y)
-{
-    int x_val = *x;
-    int y_val = *y;
-    if (x_val > y_val) {
-        *y = x_val;
-        *x = y_val;
-    }
-}
+#define SWAP_IF(arr, x, y) \
+    if (arr[x] > arr[y])   \
+    SWAP(arr, x, y)
 
 __global__ void int_memset(int* dev_arr, int n, int val)
 {
@@ -40,75 +25,96 @@ __global__ void int_memset(int* dev_arr, int n, int val)
 
 __global__ void sort_blocks(int* dev_arr)
 {
-    __shared__ int sarr[BLOCK_SIZE + (BLOCK_SIZE / WARP_SIZE) + 1];
+    __shared__ int shared[BLOCK_SIZE + (BLOCK_SIZE / WARP_SIZE) + 1];
 
-    sarr[idx(threadIdx.x)] = dev_arr[threadIdx.x + blockIdx.x * BLOCK_SIZE];
-    int second_half_idx = threadIdx.x + BLOCK_SIZE / 2;
-    sarr[idx(second_half_idx)] = dev_arr[threadIdx.x + blockIdx.x * BLOCK_SIZE + BLOCK_SIZE / 2];
+    const unsigned int thread_id = threadIdx.x,
+                       block_offset = blockIdx.x * BLOCK_SIZE,
+                       second_half_idx = thread_id + BLOCK_SIZE / 2;
 
-    if (threadIdx.x == 0)
-        sarr[idx(BLOCK_SIZE)] = INT_MAX;
+    shared[THREAD_INDEX(thread_id)] = dev_arr[thread_id + block_offset];
+    shared[THREAD_INDEX(second_half_idx)] = dev_arr[second_half_idx + block_offset];
+
+    if (thread_id == 0) {
+        shared[THREAD_INDEX(BLOCK_SIZE)] = INT_MAX;
+    }
 
     __syncthreads();
 
-    int swap1_idx1 = 2 * threadIdx.x;
-    int swap1_idx2 = 2 * threadIdx.x + 1;
-    int swap2_idx2 = 2 * threadIdx.x + 2;
+    int swap1_idx1 = 2 * thread_id,
+        swap1_idx2 = 2 * thread_id + 1,
+        swap2_idx2 = 2 * thread_id + 2;
+
+    swap1_idx1 = THREAD_INDEX(swap1_idx1);
+    swap1_idx2 = THREAD_INDEX(swap1_idx2);
+    swap2_idx2 = THREAD_INDEX(swap2_idx2);
 
     for (int i = 0; i < BLOCK_SIZE; ++i) {
-        conditional_swap(sarr + idx(swap1_idx1), sarr + idx(swap1_idx2));
+        SWAP_IF(shared, swap1_idx1, swap1_idx2);
         __syncthreads();
-
-        conditional_swap(sarr + idx(swap1_idx2), sarr + idx(swap2_idx2));
+        SWAP_IF(shared, swap1_idx2, swap2_idx2);
         __syncthreads();
     }
 
     __syncthreads();
 
-    dev_arr[threadIdx.x + blockIdx.x * BLOCK_SIZE] = sarr[idx(threadIdx.x)];
-    dev_arr[threadIdx.x + blockIdx.x * BLOCK_SIZE + BLOCK_SIZE / 2] = sarr[idx(second_half_idx)];
+    dev_arr[thread_id + block_offset] = shared[THREAD_INDEX(thread_id)];
+    dev_arr[thread_id + block_offset + BLOCK_SIZE / 2] = shared[THREAD_INDEX(second_half_idx)];
 }
 
 __global__ void merge(int* dev_arr, int iter, int type)
 {
-    __shared__ int sarr[BLOCK_SIZE + (BLOCK_SIZE / WARP_SIZE)];
+    __shared__ int shared[BLOCK_SIZE + (BLOCK_SIZE / WARP_SIZE)];
 
-    sarr[idx(threadIdx.x)] = dev_arr[threadIdx.x + blockIdx.x * BLOCK_SIZE];
-    int load_second_half_idx = BLOCK_SIZE - threadIdx.x - 1;
-    sarr[idx(load_second_half_idx)] = dev_arr[threadIdx.x + blockIdx.x * BLOCK_SIZE + BLOCK_SIZE / 2];
+    const unsigned int thread_id = threadIdx.x,
+                       block_offset = blockIdx.x * BLOCK_SIZE,
+                       load_second_half_idx = BLOCK_SIZE - thread_id - 1;
+
+    shared[THREAD_INDEX(thread_id)] = dev_arr[thread_id + block_offset];
+    shared[THREAD_INDEX(load_second_half_idx)] = dev_arr[thread_id + block_offset + BLOCK_SIZE / 2];
 
     __syncthreads();
 
     for (int stride = BLOCK_SIZE / 2; stride > 0; stride /= 2) {
-        int i = threadIdx.x / stride;
-        int j = threadIdx.x % stride;
+        int i = thread_id / stride,
+            j = thread_id % stride;
 
-        int swap_idx1 = 2 * stride * i + j;
-        int swap_idx2 = 2 * stride * i + j + stride;
+        int swap_idx1 = 2 * stride * i + j,
+            swap_idx2 = 2 * stride * i + j + stride;
+
+        swap_idx1 = THREAD_INDEX(swap_idx1);
+        swap_idx2 = THREAD_INDEX(swap_idx2);
 
         __syncthreads();
-        conditional_swap(sarr + idx(swap_idx1), sarr + idx(swap_idx2));
+
+        SWAP_IF(shared, swap_idx1, swap_idx2);
     }
 
     __syncthreads();
+    
+    dev_arr[thread_id + block_offset] = shared[THREAD_INDEX(thread_id)];
+    int store_second_half_idx = thread_id + BLOCK_SIZE / 2;
+    dev_arr[thread_id + block_offset + BLOCK_SIZE / 2] = shared[THREAD_INDEX(store_second_half_idx)];
+}
 
-    dev_arr[threadIdx.x + blockIdx.x * BLOCK_SIZE] = sarr[idx(threadIdx.x)];
-    int store_second_half_idx = threadIdx.x + BLOCK_SIZE / 2;
-    ;
-    dev_arr[threadIdx.x + blockIdx.x * BLOCK_SIZE + BLOCK_SIZE / 2] = sarr[idx(store_second_half_idx)];
+int nearest_size(int num, int prod)
+{
+    int mod = num % prod;
+    return num + (prod - ((mod == 0) ? prod : mod));
 }
 
 void block_odd_even_sort(int* arr, int n)
 {
-    int dev_n = next_multiple(n, BLOCK_SIZE);
+    // размер, кратный размеру блока
+    int dev_n = nearest_size(n, BLOCK_SIZE);
     int n_blocks = dev_n / BLOCK_SIZE;
 
     int* dev_arr;
     CSC(cudaMalloc(&dev_arr, dev_n * sizeof(int)));
     CSC(cudaMemcpy(dev_arr, arr, n * sizeof(int), cudaMemcpyHostToDevice));
 
+    // гарантия что элементы, которые получились из за расширения окажутся в начале отсортированного массива
     START_KERNEL((int_memset<<<1, BLOCK_SIZE>>>(dev_arr + n, (dev_n - n), INT_MIN)));
-
+    // подготовка блоков
     START_KERNEL((sort_blocks<<<n_blocks, BLOCK_SIZE / 2>>>(dev_arr)));
 
     if (n_blocks == 1) {

@@ -36,11 +36,11 @@
     fprintf(stderr, "time = %010.6f\n", t)
 #endif // BENCHMARK
 
-#define SWAP(a, b)      \
-    do {                \
-        int temp = (a); \
-        (a) = (b);      \
-        (b) = temp;     \
+#define SWAP(arr, a, b)    \
+    do {                   \
+        int temp = arr[a]; \
+        arr[a] = arr[b];   \
+        arr[b] = temp;     \
     } while (false)
 
 extern "C" {

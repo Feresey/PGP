@@ -1,23 +1,23 @@
-TEST_TOOL    ?= ../bin/lab4
+TEST_TOOL ?= ../bin/lab4
 
 TESTS = t1
 
 INPUT  = $(addsuffix /in,$(TESTS))
 RESULT = $(addsuffix /res,$(TESTS))
 WANT   = $(addsuffix /want,$(TESTS))
+DIFFS = $(addprefix test-,$(TESTS))
 
 .PHONY: all clean
-.PHONY: $(RESULT)
-all: $(RESULT)
-	
+
+all: $(DIFFS)
+
 clean:
 	-rm $(RESULT)
 
-DIFFS = $(addprefix test-,$(TESTS))
-test: $(DIFFS)
-
+.PHONY: $(DIFFS)
 $(DIFFS): test-%: %/want %/res
 	-diff $^
 
+.PHONY: $(RESULT) # run always
 $(RESULT): %/res: %/in
 	cat $^ | $(TEST_TOOL) > $@
