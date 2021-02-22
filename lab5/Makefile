@@ -16,7 +16,7 @@ CFLAGS += --std=c++14 -Werror cross-execution-space-call
 CFLAGS += -arch=sm_35 -Wno-deprecated-gpu-targets
 CFLAGS += -Wno-deprecated-declarations
 CFLAGS += -G
-CFLAGS += --compiler-options "-Wall -Wextra -g3 -Wunreachable-code -Wno-unused-parameter"
+CFLAGS += --compiler-options "-Wall -Wextra -g3 -Wconversion -Wsign-conversion -Wunreachable-code -Wno-unused-parameter"
 
 LDFLAGS = -lm
 
