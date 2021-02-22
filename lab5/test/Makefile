@@ -1,7 +1,7 @@
 CONVERT_TOOL ?= ../../convert/convert
 TEST_TOOL    ?= ../bin/lab5
 
-TESTS = t1 t2 t3 t4
+TESTS = t1 t2 t3 t4 t5 t6
 
 DIFFS = $(addprefix test-,$(TESTS))
 
@@ -27,7 +27,7 @@ clean:
 
 .PHONY: $(DIFFS)
 $(DIFFS): test-%: %/want.hex %/res.hex
-	-diff $^
+	-diff -q $^
 
 $(HEX_RESULT): %.hex: %.bin
 	@$(CONVERT_TOOL) hex-array --first-length=false -i $^ -o $@ --mode=decode

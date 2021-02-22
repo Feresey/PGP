@@ -11,6 +11,7 @@ TARGET_BIN = $(BINDIR)/$(TARGET)
 SEND_TARGET_DIR = $(SEND_DIR)/$(TARGET)
 
 CXX = nvcc
+CC  = nvcc
 
 CFLAGS  = -I$(SRCDIR)
 LDFLAGS = -lm
@@ -26,17 +27,18 @@ NVCCFLAGS += -D_FORCE_INLINES -Xcompiler -fPIC
 NVCCFLAGS += -Wno-deprecated-declarations
 
 ifeq ($(BENCH),on)
-GCCFLAGS = -O3
+GCCFLAGS   = -O3
 # NVCCFLAGS += -DBENCHMARK
 NVCCFLAGS += -O3
 else
+GCCFLAGS   = -g3
 NVCCFLAGS += -G
 endif
 NVCCFLAGS += --compiler-options "$(GCCFLAGS)"
 
 CU_SOURCES  = main.cu
 C_SOURCES   = helpers.c
-# CPP_SOURCES = main.cpp solve.cpp helpers.cpp
+CPP_SOURCES = main.cpp
 HEADERS     = helpers.cuh
 
 CPP_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CPP_SOURCES)))
@@ -45,6 +47,7 @@ CU_OBJECTS  = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CU_SOURCES)))
 
 ifeq ($(CUDA),off)
 CXX = g++
+CC  = gcc
 CFLAGS = $(GCCFLAGS)
 OBJECTS = $(CPP_OBJECTS) $(C_OBJECTS)
 else
@@ -89,6 +92,7 @@ $(CU_OBJECTS): $(BUILDDIR)/%.cu.o: $(SRCDIR)/%.cu | $(BUILDDIR)
 $(CPP_OBJECTS): $(BUILDDIR)/%.cpp.o: $(SRCDIR)/%.cpp | $(BUILDDIR)
 	$(compile)
 
+$(C_OBJECTS): CXX=$(CC)
 $(C_OBJECTS): $(BUILDDIR)/%.c.o: $(SRCDIR)/%.c | $(BUILDDIR)
 	$(compile)
 

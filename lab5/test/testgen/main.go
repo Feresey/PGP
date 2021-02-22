@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"crypto/rand"
 	"encoding/binary"
-	"encoding/hex"
+	"fmt"
 	"io"
 	"log"
 	"math/big"
@@ -21,8 +21,8 @@ func main() {
 		outName string
 	)
 	pflag.IntVarP(&size, "size", "s", 1024, "length of result array")
-	pflag.StringVarP(&inName, "out-in", "i", "in", "filename for input array")
-	pflag.StringVarP(&outName, "out-want", "w", "want", "filename for sorted result array")
+	pflag.StringVarP(&inName, "out-in", "i", "in.hex", "filename for input array")
+	pflag.StringVarP(&outName, "out-want", "w", "want.hex", "filename for sorted result array")
 	pflag.Parse()
 
 	outIn, err := os.Create(inName)
@@ -64,29 +64,24 @@ func writeArr(w io.Writer, arr []int, writeLen bool) error {
 	ww := bufio.NewWriterSize(w, 1<<20)
 	defer ww.Flush()
 
-	var (
-		buf [4]byte
-		enc = hex.NewEncoder(ww)
-	)
+	var buf [4]byte
+
+	swap := func(i int) int {
+		binary.LittleEndian.PutUint32(buf[:], uint32(i))
+		return int(binary.BigEndian.Uint32(buf[:]))
+	}
 
 	if writeLen {
-		binary.LittleEndian.PutUint32(buf[:], uint32(len(arr)))
-		if _, err := enc.Write(buf[:]); err != nil {
-			return err
-		}
-		_, _ = ww.Write([]byte(" "))
+		fmt.Fprintf(ww, "%08X ", swap(len(arr)))
 	}
 
 	for idx, elem := range arr {
-		binary.LittleEndian.PutUint32(buf[:], uint32(elem))
-		if _, err := enc.Write(buf[:]); err != nil {
-			return err
-		}
+		fmt.Fprintf(ww, "%08X", swap(elem))
 		if idx+1 != len(arr) {
-			_, _ = ww.Write([]byte(" "))
+			_ = ww.WriteByte(' ')
 		}
 	}
-	_, _ = ww.Write([]byte("\n"))
+	_ = ww.WriteByte('\n')
 
 	return nil
 }
