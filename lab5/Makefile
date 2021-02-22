@@ -20,7 +20,7 @@ CFLAGS += --compiler-options "-Wall -Wextra -g3 -Wunreachable-code -Wno-unused-p
 
 LDFLAGS = -lm
 
-CU_SOURCES  = fuck.cu
+CU_SOURCES  = main.cu
 C_SOURCES   = helpers.c
 # CPP_SOURCES = main.cpp solve.cpp helpers.cpp
 HEADERS     = helpers.cuh

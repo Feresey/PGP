@@ -1,99 +1,148 @@
-#include <byteswap.h>
-#include <stdint.h>
+#include <assert.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "helpers.cuh"
 
-#define THREADS 8
-#define BLOCKS 8
-#define NUM_VALS THREADS* BLOCKS
+#define BLOCK_SIZE 1024
+#define WARP_SIZE 32
 
-#define SWAP(a, b)      \
-    do {                \
-        int temp = (a); \
-        (a) = (b);      \
-        (b) = temp;     \
-    } while (false)
+// попытка выровнять блоки
+#define THREAD_INDEX(idx) ((WARP_SIZE + 1) * ((idx) / WARP_SIZE) + ((idx) % WARP_SIZE))
 
-uint32_t scan_4()
+#define SWAP_IF(arr, x, y) \
+    if (arr[x] > arr[y])   \
+    SWAP(arr, x, y)
+
+__global__ void sort_blocks_even_odd(int* dev_arr)
 {
-    uint32_t temp;
-    scanf("%x", &temp);
-    return __bswap_32(temp);
-}
+    // хвостик от выравнивания банков
+    __shared__ int shared[THREAD_INDEX(BLOCK_SIZE + 1)];
 
-void print_arr(FILE* out, const int* arr, const uint32_t size)
-{
-    for (uint32_t i = 0; i < size; ++i) {
-        fprintf(out, "%08x", __bswap_32(arr[i]));
-        if (i != size - 1) {
-            fprintf(out, " ");
-        }
+    const unsigned int thread_id = threadIdx.x,
+                       block_offset = blockIdx.x * BLOCK_SIZE,
+                       second_half_idx = thread_id + BLOCK_SIZE / 2;
+
+    shared[THREAD_INDEX(thread_id)] = dev_arr[thread_id + block_offset];
+    shared[THREAD_INDEX(second_half_idx)] = dev_arr[second_half_idx + block_offset];
+
+    if (thread_id == 0) {
+        shared[THREAD_INDEX(BLOCK_SIZE)] = INT_MAX;
     }
-    fprintf(out, "\n");
-}
 
-#define BLOCK_SIZE 4
-__global__ void kernel_bitonic_sort(int* arr)
-{
-    const uint32_t tid = threadIdx.x;
-    __shared__ int shared[BLOCK_SIZE];
-
-    shared[tid] = arr[tid];
     __syncthreads();
 
-    for (uint32_t k = 2; k <= BLOCK_SIZE; k *= 2) {
-        for (uint32_t j = k / 2; j > 0; j /= 2) {
-            uint32_t ixj = tid ^ j;
-            if (ixj > tid) {
-                if ((tid & k) == 0) {
-                    if (shared[tid] > shared[ixj]) {
-                        SWAP(shared[tid], shared[ixj]);
-                    }
-                } else {
-                    if (shared[tid] < shared[ixj]) {
-                        SWAP(shared[tid], shared[ixj]);
-                    }
-                }
-            printf("k=%d j=%d tid=%d ixj=%d %d\n", k, j, tid, ixj, ((tid & k) == 0));
-            }
-            __syncthreads();
-        }
-    }
+    int swap1 = 2 * thread_id,
+        swap2 = 2 * thread_id + 1,
+        swap3 = 2 * thread_id + 2;
 
-    arr[tid] = shared[tid];
+    swap1 = THREAD_INDEX(swap1);
+    swap2 = THREAD_INDEX(swap2);
+    swap3 = THREAD_INDEX(swap3);
+
+    // да, я знаю что тут конфликт
+    __syncthreads();
+    for (int i = 0; i < BLOCK_SIZE; ++i) {
+        __syncthreads();
+        SWAP_IF(shared, swap1, swap2);
+        __syncthreads();
+        SWAP_IF(shared, swap2, swap3);
+    }
+    __syncthreads();
+
+    dev_arr[thread_id + block_offset] = shared[THREAD_INDEX(thread_id)];
+    dev_arr[thread_id + block_offset + BLOCK_SIZE / 2] = shared[THREAD_INDEX(second_half_idx)];
 }
 
-void bitonic_sort(int* arr, const uint32_t size)
+__global__ void bitonic_merge(int* dev_arr)
 {
+    __shared__ int shared[BLOCK_SIZE];
+
+    const unsigned int thread_id = threadIdx.x,
+                       block_offset = blockIdx.x * BLOCK_SIZE,
+                       load_second_half_idx = BLOCK_SIZE - thread_id - 1,
+                       store_second_half_idx = thread_id + BLOCK_SIZE / 2;
+
+    shared[thread_id] = dev_arr[thread_id + block_offset];
+    shared[load_second_half_idx] = dev_arr[thread_id + block_offset + BLOCK_SIZE / 2];
+
+    __syncthreads();
+
+    for (int stride = BLOCK_SIZE / 2; stride > 0; stride /= 2) {
+        int i = thread_id / stride,
+            j = thread_id % stride;
+
+        int swap1 = 2 * stride * i + j,
+            swap2 = 2 * stride * i + j + stride;
+
+        __syncthreads();
+
+        SWAP_IF(shared, swap1, swap2);
+    }
+
+    __syncthreads();
+
+    dev_arr[thread_id + block_offset] = shared[thread_id];
+    dev_arr[thread_id + block_offset + BLOCK_SIZE / 2] = shared[store_second_half_idx];
+}
+
+__global__ void dummy_memset(int* dev_arr, const uint32_t n, const int val)
+{
+    int idx = threadIdx.x + blockIdx.x * blockDim.x;
+    int offset = gridDim.x * blockDim.x;
+
+    for (int i = idx; i < n; i += offset) {
+        dev_arr[i] = val;
+    }
+}
+
+int nearest_size(int num, int prod)
+{
+    int mod = num % prod;
+    return num + (prod - ((mod == 0) ? prod : mod));
+}
+
+void sort(int* arr, const uint32_t n)
+{
+    // размер, кратный размеру блока
+    const int dev_n = nearest_size(n, BLOCK_SIZE);
+    const int n_blocks = dev_n / BLOCK_SIZE;
+
     int* dev_arr;
-    CSC(cudaMalloc(&dev_arr, sizeof(int) * size));
-    CSC(cudaMemcpy(dev_arr, arr, sizeof(int) * size, cudaMemcpyHostToDevice));
-    for (uint32_t block_start = 0; block_start + BLOCK_SIZE < size; block_start += BLOCK_SIZE) {
-        START_KERNEL((kernel_bitonic_sort<<<1, BLOCK_SIZE, sizeof(int) * BLOCK_SIZE>>>(dev_arr + block_start)));
+    CSC(cudaMalloc(&dev_arr, dev_n * sizeof(int)));
+    CSC(cudaMemcpy(dev_arr, arr, n * sizeof(int), cudaMemcpyHostToDevice));
+
+    // гарантия что элементы, которые получились из за расширения окажутся в начале отсортированного массива
+    START_KERNEL((dummy_memset<<<1, BLOCK_SIZE>>>(dev_arr + n, (dev_n - n), INT_MIN)));
+    // предварительная сортировка блоков
+    START_KERNEL((sort_blocks_even_odd<<<n_blocks, BLOCK_SIZE / 2>>>(dev_arr)));
+
+    // ну если массив влез в 1 блок то зачем его сортировать ещё раз?
+    if (n_blocks == 1) {
+        goto END;
     }
-    CSC(cudaMemcpy(arr, dev_arr, sizeof(int) * size, cudaMemcpyDeviceToHost));
+
+    // Тут есть n_blocks отсортированных неубывающих последовательностей.
+    // Чтобы все элементы встали на свои места, будут сортироваться половинки блоков:
+    // Правая половина первого и левая половина второго; правая половина второго и левая третьего; ...
+    // Чудесное совпадение, что битоническое слияние как раз на такое и рассчитано.
+    for (uint32_t iter = 0; iter < n_blocks; ++iter) {
+        // BLOCK_SIZE/2 потому что каждый поток владеет
+        // одним элементом от первого отсортированного блока и одним от второго
+        START_KERNEL((bitonic_merge<<<n_blocks - 1, BLOCK_SIZE / 2>>>(dev_arr + BLOCK_SIZE / 2)));
+        START_KERNEL((bitonic_merge<<<n_blocks, BLOCK_SIZE / 2>>>(dev_arr)));
+    }
+
+END:
+    // обрезание хвостика, который добавлялся для выравнивания. Можно было конечно вписать INT_MAX, но так не интересно.
+    CSC(cudaMemcpy(arr, dev_arr + (dev_n - n), n * sizeof(int), cudaMemcpyDeviceToHost));
     CSC(cudaFree(dev_arr));
-}
-
-void odd_even_sorting(int* arr, const uint32_t size)
-{
-    for (size_t i = 0; i < size; i++) {
-        for (size_t j = i & 1; j < size - 1; j += 2) {
-            if (arr[j] > arr[j + 1]) {
-                SWAP(arr[j], arr[j + 1]);
-            }
-        }
-    }
-}
-
-void odd_even(int* arr, const uint32_t size)
-{
 }
 
 int main()
 {
+    // как же неудобно работать с little/big endian в СИ
     uint32_t size = scan_4();
 
     int* arr = (int*)malloc(size * sizeof(int));
@@ -101,11 +150,8 @@ int main()
         arr[i] = int(scan_4());
     }
 
-    bitonic_sort(arr, size);
-    // odd_even_sorting(arr, size);
-
+    sort(arr, size);
     print_arr(stdout, arr, size);
-
     free(arr);
     return 0;
 }

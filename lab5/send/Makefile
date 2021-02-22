@@ -1,2 +1,2 @@
 all:
-	nvcc -lm main.cu -o lab3
+	nvcc -lm main.cu helpers.c -o lab3
