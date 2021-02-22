@@ -5,7 +5,7 @@
 
 #include "helpers.cuh"
 
-#define BLOCK_SIZE 1024
+#define BLOCK_SIZE 256
 #define WARP_SIZE 32
 
 // попытка выровнять блоки

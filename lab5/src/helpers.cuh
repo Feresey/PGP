@@ -19,21 +19,22 @@
     KERNEL;                  \
     CSC(cudaGetLastError())
 #else
-#define START_KERNEL(KERNEL)                                         \
-    cudaEvent_t start, end;                                          \
-    CSC(cudaEventCreate(&start));                                    \
-    CSC(cudaEventCreate(&end));                                      \
-    CSC(cudaEventRecord(start));                                     \
-    fprintf(stderr, "blocks = %d\nthreads = %d\n", blocks, threads); \
-    KERNEL;                                                          \
-    CSC(cudaGetLastError());                                         \
-    CSC(cudaEventRecord(end));                                       \
-    CSC(cudaEventSynchronize(end));                                  \
-    float t;                                                         \
-    CSC(cudaEventElapsedTime(&t, start, end));                       \
-    CSC(cudaEventDestroy(start));                                    \
-    CSC(cudaEventDestroy(end));                                      \
-    fprintf(stderr, "time = %010.6f\n", t)
+#define START_KERNEL(KERNEL)                                             \
+    do {                                                                 \
+        cudaEvent_t start, end;                                          \
+        CSC(cudaEventCreate(&start));                                    \
+        CSC(cudaEventCreate(&end));                                      \
+        CSC(cudaEventRecord(start));                                     \
+        KERNEL;                                                          \
+        CSC(cudaGetLastError());                                         \
+        CSC(cudaEventRecord(end));                                       \
+        CSC(cudaEventSynchronize(end));                                  \
+        float t;                                                         \
+        CSC(cudaEventElapsedTime(&t, start, end));                       \
+        CSC(cudaEventDestroy(start));                                    \
+        CSC(cudaEventDestroy(end));                                      \
+        fprintf(stderr, "time = %010.6f\n", t);                          \
+    } while (false)
 #endif // BENCHMARK
 
 #define SWAP(arr, a, b)    \
