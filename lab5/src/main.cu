@@ -100,7 +100,10 @@ __global__ void dummy_memset(int* dev_arr, const uint32_t n, const int val)
 uint32_t nearest_size(const uint32_t num, const uint32_t prod)
 {
     uint32_t mod = num % prod;
-    return num + (prod - ((mod == 0) ? prod : mod));
+    if (mod == 0) {
+        return num;
+    }
+    return num + (prod - mod);
 }
 
 void sort(int* arr, const uint32_t n)
@@ -116,6 +119,7 @@ void sort(int* arr, const uint32_t n)
     // гарантия что элементы, которые получились из за расширения окажутся в начале отсортированного массива
     START_KERNEL((dummy_memset<<<1, BLOCK_SIZE>>>(dev_arr + n, (dev_n - n), INT_MIN)));
 
+    fprintf(stderr, "n_blocks: %d, bs: %d\n", n_blocks, BLOCK_SIZE / 2);
     // предварительная сортировка блоков
     START_KERNEL((sort_blocks_even_odd<<<n_blocks, BLOCK_SIZE / 2>>>(dev_arr)));
 
@@ -172,7 +176,7 @@ int main()
 
     struct timespec start_time = timer_start();
     sort(arr, size);
-    fprintf(stderr, "sort time: %d\n", timer_end(start_time));
+    fprintf(stderr, "sort time: %ld\n", timer_end(start_time));
     print_arr(stdout, arr, size);
 
     free(arr);

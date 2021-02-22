@@ -1,2 +1,2 @@
 all:
-	nvcc -lm main.cu helpers.c -o lab5
+	nvcc -lm -D_FORCE_INLINES -Xcompiler -fPIC main.cu helpers.c -o lab5

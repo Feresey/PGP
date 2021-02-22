@@ -22,6 +22,7 @@ GCCFLAGS = -Wall -Wextra -g3 \
 
 NVCCFLAGS += --std=c++11 -Werror cross-execution-space-call
 NVCCFLAGS += -arch=sm_35 -Wno-deprecated-gpu-targets
+NVCCFLAGS += -D_FORCE_INLINES -Xcompiler -fPIC
 NVCCFLAGS += -Wno-deprecated-declarations
 
 ifeq ($(BENCH),on)
