@@ -5,7 +5,7 @@
 
 #include "helpers.cuh"
 
-#define BLOCK_SIZE 256
+#define BLOCK_SIZE 1024
 #define WARP_SIZE 32
 
 // попытка выровнять блоки
@@ -97,7 +97,7 @@ __global__ void dummy_memset(int* dev_arr, const uint32_t n, const int val)
     }
 }
 
-uint32_t nearest_size(const uint32_t num,const  uint32_t prod)
+uint32_t nearest_size(const uint32_t num, const uint32_t prod)
 {
     uint32_t mod = num % prod;
     return num + (prod - ((mod == 0) ? prod : mod));
@@ -115,6 +115,7 @@ void sort(int* arr, const uint32_t n)
 
     // гарантия что элементы, которые получились из за расширения окажутся в начале отсортированного массива
     START_KERNEL((dummy_memset<<<1, BLOCK_SIZE>>>(dev_arr + n, (dev_n - n), INT_MIN)));
+
     // предварительная сортировка блоков
     START_KERNEL((sort_blocks_even_odd<<<n_blocks, BLOCK_SIZE / 2>>>(dev_arr)));
 
@@ -140,6 +141,25 @@ END:
     CSC(cudaFree(dev_arr));
 }
 
+// #include <time.h>
+
+// // call this function to start a nanosecond-resolution timer
+// struct timespec timer_start()
+// {
+//     struct timespec start_time;
+//     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
+//     return start_time;
+// }
+
+// // call this function to end a timer, returning nanoseconds elapsed as a long
+// long timer_end(struct timespec start_time)
+// {
+//     struct timespec end_time;
+//     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end_time);
+//     long diffInNanos = (end_time.tv_sec - start_time.tv_sec) * (long)1e9 + (end_time.tv_nsec - start_time.tv_nsec);
+//     return diffInNanos;
+// }
+
 int main()
 {
     // как же неудобно работать с little/big endian в СИ
@@ -150,9 +170,9 @@ int main()
         arr[i] = int(scan_4());
     }
 
-    print_arr(stderr, arr, size);
     sort(arr, size);
     print_arr(stdout, arr, size);
+
     free(arr);
     return 0;
 }

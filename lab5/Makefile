@@ -23,10 +23,15 @@ GCCFLAGS = -Wall -Wextra -g3 \
 NVCCFLAGS += --std=c++11 -Werror cross-execution-space-call
 NVCCFLAGS += -arch=sm_35 -Wno-deprecated-gpu-targets
 NVCCFLAGS += -Wno-deprecated-declarations
-NVCCFLAGS += -DBENCHMARK
-NVCCFLAGS += -G
-NVCCFLAGS += --compiler-options "$(GCCFLAGS)"
 
+ifeq ($(BENCH),on)
+GCCFLAGS = -O3
+# NVCCFLAGS += -DBENCHMARK
+NVCCFLAGS += -O3
+else
+NVCCFLAGS += -G
+endif
+NVCCFLAGS += --compiler-options "$(GCCFLAGS)"
 
 CU_SOURCES  = main.cu
 C_SOURCES   = helpers.c
