@@ -150,6 +150,7 @@ int main()
         arr[i] = int(scan_4());
     }
 
+    print_arr(stderr, arr, size);
     sort(arr, size);
     print_arr(stdout, arr, size);
     free(arr);
