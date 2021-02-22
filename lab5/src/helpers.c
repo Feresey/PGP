@@ -1,13 +1,14 @@
 #include <byteswap.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <assert.h>
 
 uint32_t scan_4()
 {
     uint32_t temp;
-    scanf("%x", &temp);
     // вот запустит потом какой-нибудь умник этот чудесный код на одноплатнике с другим порядком байт...
-    return __bswap_32(temp);
+    assert(fread(&temp, sizeof(uint32_t), 1, stdin) == 1);
+    return temp;
 }
 
 void print_arr(FILE *out, const int *arr, const uint32_t size)

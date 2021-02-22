@@ -119,7 +119,7 @@ void sort(int* arr, const uint32_t n)
     // гарантия что элементы, которые получились из за расширения окажутся в начале отсортированного массива
     START_KERNEL((dummy_memset<<<1, BLOCK_SIZE>>>(dev_arr + n, (dev_n - n), INT_MIN)));
 
-    fprintf(stderr, "n_blocks: %d, bs: %d\n", n_blocks, BLOCK_SIZE / 2);
+    fprintf(stderr, "n: %d, dev_n: %d, n_blocks: %d, bs: %d\n", n, dev_n, n_blocks, BLOCK_SIZE / 2);
     // предварительная сортировка блоков
     START_KERNEL((sort_blocks_even_odd<<<n_blocks, BLOCK_SIZE / 2>>>(dev_arr)));
 
@@ -168,6 +168,9 @@ int main()
 {
     // как же неудобно работать с little/big endian в СИ
     uint32_t size = scan_4();
+    if (size == 0) { // foolproof
+        return 0;
+    }
 
     int* arr = (int*)malloc(size * sizeof(int));
     for (uint32_t i = 0; i < size; ++i) {
@@ -177,7 +180,7 @@ int main()
     struct timespec start_time = timer_start();
     sort(arr, size);
     fprintf(stderr, "sort time: %ld\n", timer_end(start_time));
-    print_arr(stdout, arr, size);
+    fwrite(arr, sizeof(int), size, stdout);
 
     free(arr);
     return 0;

@@ -29,7 +29,7 @@ func New() *cobra.Command {
 	}
 	c.flags(cmd, nil)
 
-	cmd.AddCommand(c.imageCommand(), c.hexCommand(), c.pixelsCommand())
+	cmd.AddCommand(c.imageCommand(), c.hexCommand(), c.hexArrayCommand(), c.pixelsCommand())
 
 	return cmd
 }
@@ -53,6 +53,17 @@ func (c *command) hexCommand() *cobra.Command {
 		Use:  "hex",
 		RunE: newHexTool(c).RunE,
 	}
+}
+
+func (c *command) hexArrayCommand() *cobra.Command {
+	ha := newHexArrayTool(c)
+	cmd := &cobra.Command{
+		Use:  "hex-array",
+		RunE: ha.RunE,
+	}
+	ha.flags(cmd)
+
+	return cmd
 }
 
 func (c *command) pixelsCommand() *cobra.Command {
