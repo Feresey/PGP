@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"io"
+	"log"
 	"math/big"
 	"os"
 	"sort"
@@ -38,7 +39,7 @@ func main() {
 
 	arr := make([]int, size)
 
-	println("generate array")
+	log.Println("generate array")
 	for idx := range arr {
 		num, err := rand.Int(rand.Reader, big.NewInt(1<<31))
 		if err != nil {
@@ -47,13 +48,13 @@ func main() {
 		arr[idx] = int(num.Int64())
 	}
 
-	println("write generated")
+	log.Println("write generated")
 	if err := writeArr(outIn, arr, true); err != nil {
 		panic(err)
 	}
-	println("sort")
+	log.Println("sort")
 	sort.Ints(arr)
-	println("write result")
+	log.Println("write result")
 	if err := writeArr(outWant, arr, false); err != nil {
 		panic(err)
 	}
