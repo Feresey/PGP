@@ -12,13 +12,20 @@ SEND_TARGET_DIR = $(SEND_DIR)/$(TARGET)
 
 CXX = nvcc
 
-CFLAGS += --std=c++14 -Werror cross-execution-space-call
-CFLAGS += -arch=sm_35 -Wno-deprecated-gpu-targets
-CFLAGS += -Wno-deprecated-declarations
-CFLAGS += -G
-CFLAGS += --compiler-options "-Wall -Wextra -g3 -Wconversion -Wsign-conversion -Wunreachable-code -Wno-unused-parameter"
-
+CFLAGS  = -I$(SRCDIR)
 LDFLAGS = -lm
+
+GCCFLAGS = -Wall -Wextra -g3 \
+			-Wno-sign-compare -Wno-long-long \
+			-Wconversion -Wsign-conversion \
+			-Wunreachable-code -Wno-unused-parameter
+
+NVCCFLAGS += --std=c++11 -Werror cross-execution-space-call
+NVCCFLAGS += -arch=sm_35 -Wno-deprecated-gpu-targets
+NVCCFLAGS += -Wno-deprecated-declarations
+NVCCFLAGS += -G
+NVCCFLAGS += --compiler-options "$(GCCFLAGS)"
+
 
 CU_SOURCES  = main.cu
 C_SOURCES   = helpers.c
@@ -31,13 +38,13 @@ CU_OBJECTS  = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CU_SOURCES)))
 
 ifeq ($(CUDA),off)
 CXX = g++
-CFLAGS = -Wall -Wextra -Wpedantic -g3 -Wconversion -Wsign-conversion -Wunreachable-code
-OBJECTS = $(CPP_OBJECTS)
+CFLAGS = $(GCCFLAGS)
+OBJECTS = $(CPP_OBJECTS) $(C_OBJECTS)
 else
+CFLAGS = $(NVCCFLAGS)
 OBJECTS = $(CU_OBJECTS) $(C_OBJECTS)
 endif
 
-CFLAGS += -I$(SRCDIR)
 
 .PHONY: all clean
 all: $(TARGET)

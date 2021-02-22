@@ -12,7 +12,8 @@ uint32_t scan_4()
 
 void print_arr(FILE *out, const int *arr, const uint32_t size)
 {
-    for (uint32_t i = 0; i < size; ++i)
+    uint32_t i; // error: ‘for’ loop initial declarations are only allowed in C99 mode
+    for (i = 0; i < size; ++i)
     {
         fprintf(out, "%08x", __bswap_32((uint32_t)arr[i]));
         if (i != size - 1)
