@@ -141,24 +141,24 @@ END:
     CSC(cudaFree(dev_arr));
 }
 
-// #include <time.h>
+#include <time.h>
 
-// // call this function to start a nanosecond-resolution timer
-// struct timespec timer_start()
-// {
-//     struct timespec start_time;
-//     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
-//     return start_time;
-// }
+// call this function to start a nanosecond-resolution timer
+struct timespec timer_start()
+{
+    struct timespec start_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
+    return start_time;
+}
 
-// // call this function to end a timer, returning nanoseconds elapsed as a long
-// long timer_end(struct timespec start_time)
-// {
-//     struct timespec end_time;
-//     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end_time);
-//     long diffInNanos = (end_time.tv_sec - start_time.tv_sec) * (long)1e9 + (end_time.tv_nsec - start_time.tv_nsec);
-//     return diffInNanos;
-// }
+// call this function to end a timer, returning nanoseconds elapsed as a long
+long timer_end(struct timespec start_time)
+{
+    struct timespec end_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end_time);
+    long diffInNanos = (end_time.tv_sec - start_time.tv_sec) * (long)1e9 + (end_time.tv_nsec - start_time.tv_nsec);
+    return diffInNanos;
+}
 
 int main()
 {
@@ -170,7 +170,9 @@ int main()
         arr[i] = int(scan_4());
     }
 
+    struct timespec start_time = timer_start();
     sort(arr, size);
+    fprintf(stderr, "sort time: %d\n", timer_end(start_time));
     print_arr(stdout, arr, size);
 
     free(arr);
