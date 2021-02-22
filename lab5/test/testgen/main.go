@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
@@ -37,6 +38,7 @@ func main() {
 
 	arr := make([]int, size)
 
+	println("generate array")
 	for idx := range arr {
 		num, err := rand.Int(rand.Reader, big.NewInt(1<<31))
 		if err != nil {
@@ -45,19 +47,25 @@ func main() {
 		arr[idx] = int(num.Int64())
 	}
 
+	println("write generated")
 	if err := writeArr(outIn, arr, true); err != nil {
 		panic(err)
 	}
+	println("sort")
 	sort.Ints(arr)
+	println("write result")
 	if err := writeArr(outWant, arr, false); err != nil {
 		panic(err)
 	}
 }
 
 func writeArr(w io.Writer, arr []int, writeLen bool) error {
+	ww := bufio.NewWriterSize(w, 1<<20)
+	defer ww.Flush()
+
 	var (
 		buf [4]byte
-		enc = hex.NewEncoder(w)
+		enc = hex.NewEncoder(ww)
 	)
 
 	if writeLen {
@@ -65,7 +73,7 @@ func writeArr(w io.Writer, arr []int, writeLen bool) error {
 		if _, err := enc.Write(buf[:]); err != nil {
 			return err
 		}
-		_, _ = w.Write([]byte(" "))
+		_, _ = ww.Write([]byte(" "))
 	}
 
 	for idx, elem := range arr {
@@ -74,10 +82,10 @@ func writeArr(w io.Writer, arr []int, writeLen bool) error {
 			return err
 		}
 		if idx+1 != len(arr) {
-			_, _ = w.Write([]byte(" "))
+			_, _ = ww.Write([]byte(" "))
 		}
 	}
-	_, _ = w.Write([]byte("\n"))
+	_, _ = ww.Write([]byte("\n"))
 
 	return nil
 }
