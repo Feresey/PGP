@@ -26,7 +26,7 @@ NVCCFLAGS += -Wno-deprecated-declarations
 
 ifeq ($(BENCH),on)
 GCCFLAGS   = -O3
-# NVCCFLAGS += -DBENCHMARK
+NVCCFLAGS += -DBENCHMARK
 NVCCFLAGS += -O3
 else
 GCCFLAGS  += -g3
