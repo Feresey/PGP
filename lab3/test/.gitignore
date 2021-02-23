@@ -1,2 +1,5 @@
 *.bin
+t*/*.png
 res.hex
+t3
+t4

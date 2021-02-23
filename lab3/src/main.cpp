@@ -28,6 +28,11 @@ float4 make_float4(float x, float y, float z, float w)
     return float4 { x, y, z, w };
 }
 
+uchar4 make_uchar4(uchar x, uchar y, uchar z, uchar w)
+{
+    return uchar4 { x, y, z, w };
+}
+
 float4 dev_centers[MAX_CLUSTERS];
 
 float pixel_dist(uchar4 a, float4 b)
@@ -86,24 +91,24 @@ void launch_k_means(
         host_centers[i].z = center_pixel.z;
         host_centers[i].w = 0.0f;
 
-        printf("%d: (x=%d, y=%d, pos=%ld) %02x%02x%02x\n",
-            i,
-            center.x, center.y, pos,
-            center_pixel.x, center_pixel.y, center_pixel.z);
+        // printf("%d: (x=%d, y=%d, pos=%ld) %02x%02x%02x\n",
+        //     i,
+        //     center.x, center.y, pos,
+        //     center_pixel.x, center_pixel.y, center_pixel.z);
     }
 
     int iter = 0;
     while (++iter) {
 
-        char outname[256];
-        sprintf(outname, "%s.%d.points", testname, iter);
-        FILE* out = fopen(outname, "w");
-        for (size_t i = 0; i < n_pixels; ++i) {
-            const uchar4 pixel = pixels[i];
-            const float4 cluster = host_centers[pixel.w];
-            fprintf(out, "%lu %d %d %d %d %d %d %d\n", i, pixel.x, pixel.y, pixel.z, pixel.w, uchar(cluster.x), uchar(cluster.y), uchar(cluster.z));
-        }
-        fclose(out);
+        // char outname[256];
+        // sprintf(outname, "%s.%d.points", testname, iter);
+        // FILE* out = fopen(outname, "w");
+        // for (size_t i = 0; i < n_pixels; ++i) {
+        //     const uchar4 pixel = pixels[i];
+        //     const float4 cluster = host_centers[pixel.w];
+        //     // fprintf(out, "%lu %d %d %d %d %d %d %d\n", i, pixel.x, pixel.y, pixel.z, pixel.w, uchar(cluster.x), uchar(cluster.y), uchar(cluster.z));
+        // }
+        // fclose(out);
 
         memcpy(dev_centers, host_centers, sizeof(float4) * n_clusters);
         calc_distances(pixels, n_pixels, n_clusters);
@@ -140,6 +145,31 @@ void launch_k_means(
             break;
         }
     }
+
+    for (size_t i = 0; i < n_pixels; ++i) {
+        uchar4 p = pixels[i];
+        float4 cluster = host_centers[p.w];
+        pixels[i] = make_uchar4(uchar(cluster.x), uchar(cluster.y), uchar(cluster.z), 255);
+    }
+}
+
+#include <time.h>
+
+// call this function to start a nanosecond-resolution timer
+struct timespec timer_start()
+{
+    struct timespec start_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
+    return start_time;
+}
+
+// call this function to end a timer, returning nanoseconds elapsed as a long
+long timer_end(struct timespec start_time)
+{
+    struct timespec end_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end_time);
+    long diffInNanos = (end_time.tv_sec - start_time.tv_sec) * (long)1e9 + (end_time.tv_nsec - start_time.tv_nsec);
+    return diffInNanos;
 }
 
 int main()
@@ -173,7 +203,9 @@ int main()
     read_image(in, &data, &w, &h);
     fclose(in);
 
+    struct timespec start_time = timer_start();
     launch_k_means(input, data, w, h, centers, n_clusters);
+    fprintf(stderr, "run: %d\n", timer_end(start_time));
 
     FILE* out = fopen(output, "wb");
     if (out == NULL || ferror(out)) {

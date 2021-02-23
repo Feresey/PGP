@@ -1,12 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 
 	"github.com/spf13/cobra"
 )
@@ -32,13 +32,16 @@ func (h *hexTool) RunE(cmd *cobra.Command, args []string) error {
 	}
 	defer out.Close()
 
+	bufout := bufio.NewWriterSize(out, 1<<20)
+	defer bufout.Flush()
+
 	switch h.mode {
 	case "encode":
-		if err := h.encode(in, out); err != nil {
+		if err := h.encode(in, bufout); err != nil {
 			return fmt.Errorf("encode: %w", err)
 		}
 	case "decode":
-		if err := h.decode(in, out); err != nil {
+		if err := h.decode(in, bufout); err != nil {
 			return fmt.Errorf("decode: %w", err)
 		}
 	default:
@@ -50,27 +53,23 @@ func (h *hexTool) RunE(cmd *cobra.Command, args []string) error {
 
 func (h *hexTool) encode(r io.Reader, w io.Writer) error {
 	var (
-		num string
+		num uint32
 		buf = make([]byte, 4)
 	)
 
 	for {
-		_, err := fmt.Fscanf(r, "%s", &num)
+		_, err := fmt.Fscanf(r, "%x", &num)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return nil
 			}
-			return err
+			return fmt.Errorf("scan number: %w", err)
 		}
 
-		res, err := strconv.ParseUint(num, 16, 32)
-		if err != nil {
-			return err
-		}
-
-		binary.BigEndian.PutUint32(buf, uint32(res))
+		binary.BigEndian.PutUint32(buf, num)
+		// binary.BigEndian.PutUint32(buf, binary.LittleEndian.Uint32(buf))
 		if _, err := w.Write(buf); err != nil {
-			return err
+			return fmt.Errorf("write res: %w", err)
 		}
 	}
 }

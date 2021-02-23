@@ -30,8 +30,8 @@ func (i *Image) At(x, y int) color.Color { return i.buf[y][x] }
 
 func NewImage(r io.Reader, w, h uint32) (image.Image, error) {
 	res := &Image{
-		h:   int(h),
 		w:   int(w),
+		h:   int(h),
 		buf: make([][]color.RGBA, h),
 	}
 
@@ -40,12 +40,12 @@ func NewImage(r io.Reader, w, h uint32) (image.Image, error) {
 	for y := 0; y < res.h; y++ {
 		res.buf[y] = make([]color.RGBA, res.w)
 		for x := 0; x < res.w; x++ {
-			_, err := r.Read(buf)
+			_, err := io.ReadFull(r, buf)
 			pixel := color.RGBA{
 				R: buf[0],
 				G: buf[1],
 				B: buf[2],
-				A: 255,
+				A: buf[3],
 			}
 			if err != nil {
 				if errors.Is(err, io.EOF) {
@@ -81,13 +81,17 @@ func (i *imageTool) RunE(cmd *cobra.Command, args []string) error {
 	}
 	defer out.Close()
 
+	bufin := bufio.NewReaderSize(in, 1<<20)
+	bufout := bufio.NewWriterSize(out, 1<<20)
+	defer bufout.Flush()
+
 	switch i.mode {
 	case "encode":
-		if err := i.encode(in, out); err != nil {
+		if err := i.encode(bufin, bufout); err != nil {
 			return fmt.Errorf("encode: %w", err)
 		}
 	case "decode":
-		if err := i.decode(in, out, filepath.Ext(i.output)); err != nil {
+		if err := i.decode(bufin, bufout, filepath.Ext(i.output)); err != nil {
 			return fmt.Errorf("decode: %w", err)
 		}
 	default:
@@ -98,15 +102,11 @@ func (i *imageTool) RunE(cmd *cobra.Command, args []string) error {
 }
 
 func (i *imageTool) encode(r io.Reader, w io.Writer) error {
-	var (
-		img image.Image
-		err error
-	)
-	img, _, err = image.Decode(r)
+	img, name, err := image.Decode(r)
+	println(name)
 	if err != nil {
 		return fmt.Errorf("decode image: %w", err)
 	}
-
 	bounds := img.Bounds()
 	buf := make([]byte, 8)
 	binary.LittleEndian.PutUint32(buf[:4], uint32(bounds.Max.X-bounds.Min.X))
@@ -127,13 +127,15 @@ func (i *imageTool) encode(r io.Reader, w io.Writer) error {
 
 func (i *imageTool) decode(r io.Reader, w io.Writer, ext string) error {
 	buf := make([]byte, 8)
-	_, err := r.Read(buf)
+	_, err := io.ReadFull(r, buf)
 	if err != nil {
 		return fmt.Errorf("read dimensions: %w", err)
 	}
 
 	width := binary.LittleEndian.Uint32(buf[:4])
 	height := binary.LittleEndian.Uint32(buf[4:])
+
+	println(width, height)
 
 	img, err := NewImage(r, width, height)
 	if err != nil {
