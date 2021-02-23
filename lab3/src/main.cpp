@@ -164,14 +164,13 @@ struct timespec timer_start()
 }
 
 // call this function to end a timer, returning nanoseconds elapsed as a long
-long timer_end(struct timespec start_time)
+unsigned long long timer_end(struct timespec start_time)
 {
     struct timespec end_time;
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end_time);
-    long diffInNanos = (end_time.tv_sec - start_time.tv_sec) * (long)1e9 + (end_time.tv_nsec - start_time.tv_nsec);
+    unsigned long long diffInNanos = (unsigned long long)(end_time.tv_sec - start_time.tv_sec) * (unsigned long long)1e9 + (unsigned long long)(end_time.tv_nsec - start_time.tv_nsec);
     return diffInNanos;
 }
-
 int main()
 {
     char input[255], output[255];
@@ -205,7 +204,7 @@ int main()
 
     struct timespec start_time = timer_start();
     launch_k_means(input, data, w, h, centers, n_clusters);
-    fprintf(stderr, "run: %d\n", timer_end(start_time));
+    fprintf(stderr, "run: %lld\n", timer_end(start_time));
 
     FILE* out = fopen(output, "wb");
     if (out == NULL || ferror(out)) {

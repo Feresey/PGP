@@ -25,79 +25,136 @@ $nc <= 32$.
 
 \se{Метод решения}
 
+Метод k-средних простой как палка.
+Нужно всего лишь каждый пиксель сопоставить с ближайшим по цвету кластером.
+Изначальные цвета кластеров задаются явно, либо выбираются из случайных пикселей изображения.
+
+Вся прелесть алгоритма в том что в процессе работы центры классов могут изменяться в зависимости
+от принадлежащих кластеру точек. Получается некоторый ``средний вес''.
+
+Очевидно что алгоритм не отработает за одну итерацию, если центры могут перемещаться.
+
+Но чтобы алгоритм всё таки мог завершиться нужно условие выхода:
+
+\begin{enumerate}
+	\item Правильное условие: на текущей итерации все пиксели принадлежат тем же классам, каким принадлежали
+	      на предыдущей итерации.
+	\item Простое условие: новые значения центров классов отличаются по норме не более чем на
+	      $\varepsilon$ от предыдущих значений.
+\end{enumerate}
+
+Второе условие всё же более предпочтительно, т.к. классов будет явно меньше чем пикселей.
 
 \se{Описание программы}
 
+\subsubsection*{Созданные ядра:}
 
+\begin{itemize}
+	\item \lstinline|kernel| --- название красноречиво. Сопоставляет каждый пиксель
+	      его ближайшему классу, точнее аккумулирует значения пикселей класса в небольшой кеш,
+	      равный по размеру количеству классов.
+	\item \lstinline|calc_centers| --- вычисление новых центров классов, которое основывается
+	      на кеше, полученном от первого ядра. Тут же проверяется близость новых центров классов и старых.
+\end{itemize}
+
+\subsubsection*{Дополнительные условия:}
+
+По условиям лабораторной следует использовать константную память.
+
+Так как размер её ограничен (64КБ), то записать в неё изображение не получится.
+
+А вот центры классов будут очень даже хорошо смотреться в константной памяти,
+так как их немного и они все постоянно используются в первом ядре.
 
 {
-	\scriptsize
-	\listsource{../src}{main.cu}
+\listsource{../src}{main.cu}
 }
-
-\newpage
 
 \se{Результаты}
 
+% \begin{figure}[tbh]
+% 	\caption*{Малое изображение: 400x408}
+% 	\begin{subfigure}{0.49\textwidth}
+% 		\centering
+% 		\caption*{Исходное изображение}
+% 		\includegraphics[scale=0.4]{../test/images/nigger.png}
+% 	\end{subfigure}
+% 	\begin{subfigure}{0.49\textwidth}
+% 		\centering
+% 		\caption*{Результат:}
+% 		\includegraphics[scale=0.4]{../test/t3/res.png}
+% 	\end{subfigure}
+% \end{figure}
 
-\begin{figure}[tbh]
-	\caption*{Малое изображение: 400x408}
-	\begin{subfigure}{0.49\textwidth}
-		\centering
-		\caption*{Исходное изображение}
-		\includegraphics[scale=0.4]{../test/images/nigger.png}
-	\end{subfigure}
-	\begin{subfigure}{0.49\textwidth}
-		\centering
-		\caption*{Результат:}
-		\includegraphics[scale=0.4]{../test/t3/res.png}
-	\end{subfigure}
-\end{figure}
+% Были выделены пиксели с отдельных лепестков и из центральной области.
 
-Были выделены пиксели с отдельных лепестков и из центральной области.
-
-\begin{figure}[tbh]
-	\caption*{Большое изображение: 6000x4000}
-	\begin{subfigure}{0.49\textwidth}
-		\centering
-		\caption*{Исходное изображение}
-		\includegraphics[scale=0.159]{../test/images/pumpkin.png}
-	\end{subfigure}
-	\begin{subfigure}{0.49\textwidth}
-		\centering
-		\caption*{Результат:}
-		\includegraphics[scale=0.038]{../test/t4/res.png}
-	\end{subfigure}
-\end{figure}
+% \begin{figure}[tbh]
+% 	\caption*{Большое изображение: 6000x4000}
+% 	\begin{subfigure}{0.49\textwidth}
+% 		\centering
+% 		\caption*{Исходное изображение}
+% 		\includegraphics[scale=0.159]{../test/images/pumpkin.png}
+% 	\end{subfigure}
+% 	\begin{subfigure}{0.49\textwidth}
+% 		\centering
+% 		\caption*{Результат:}
+% 		\includegraphics[scale=0.038]{../test/t4/res.png}
+% 	\end{subfigure}
+% \end{figure}
 
 Были выделены пиксели на облаке, чистом небе, тыкве и соломе.
 Но так получилось что цвет соломы оказался несколько ближе к цвету тыквы.
 
 \textit{Время указано в миллисекундах}
 
+Малое изображение:
 
-% \begin{center}
-% 	cpu time = 348.877649
-% 	\begin{table*}[!htb]
-% 		\centering
-% 		\begin{tabular}{|c|c|c|}
-% 			\hline
-% 			blocks    & threads & time        \\
-% 			\hline
-% 			16x16     & 16x16   & 005.450240  \\
-% 			32x32     & 16x16   & 005.528064  \\
-% 			8x8       & 8x8     & 005.688256  \\
-% 			16x16     & 32x32   & 005.862272  \\
-% 			64x64     & 16x16   & 005.932992  \\
-% 			32x32     & 32x32   & 006.667456  \\
-% 			4x4       & 4x4     & 021.764448  \\
-% 			1024x1024 & 16x16   & 031.003839  \\
-% 			1024x1024 & 32x32   & 204.964478  \\
-% 			1x1       & 1x1     & 3699.413574 \\
-% 			\hline
-% 		\end{tabular}
-% 	\end{table*}
-% \end{center}
+\begin{center}
+	cpu time = 5.29322
+	\begin{table*}[!htb]
+		\centering
+		\begin{tabular}{|c|c|c|}
+			\hline
+			blocks & threads & time        \\
+			\hline
+
+			1      & 32      & 201.184063  \\
+			16     & 16      & 290.349113  \\
+			32     & 32      & 2561.765715 \\
+			32     & 64      & 296.941000  \\
+			64     & 64      & 146.438572  \\
+			64     & 128     & 140.186692  \\
+			128    & 1024    & 139.336220  \\
+			1024   & 1024    & 142.516288  \\
+			\hline
+		\end{tabular}
+	\end{table*}
+\end{center}
+
+Большое изображение:
+
+\begin{center}
+	cpu time = 605.091354
+	\begin{table*}[!htb]
+		\centering
+		\begin{tabular}{|c|c|c|}
+			\hline
+			blocks & threads & time         \\
+			\hline
+
+			1      & 32      & 84191.246064 \\
+			16     & 16      & 7494.419552  \\
+			32     & 32      & 3855.833430  \\
+			32     & 64      & 4167.838969  \\
+			64     & 64      & 5816.296628  \\
+			64     & 128     & 3968.485597  \\
+			128    & 1024    & 3962.384164  \\
+			1024   & 1024    & 3965.347436  \\
+			\hline
+		\end{tabular}
+	\end{table*}
+\end{center}
+
 
 
 \se{Выводы}

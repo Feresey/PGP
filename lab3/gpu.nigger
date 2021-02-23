@@ -1,24 +1,24 @@
 blocks = 1
 threads = 32
-run: 201184063
+time = 201.184063
 blocks = 16
 threads = 16
-run: 290349113
+time = 290.349113
 blocks = 32
 threads = 32
-run: 2561765715
+time = 2561.765715
 blocks = 32
 threads = 64
-run: 296941000
+time = 296.941000
 blocks = 64
 threads = 64
-run: 146438572
+time = 146.438572
 blocks = 64
 threads = 128
-run: 140186692
+time = 140.186692
 blocks = 128
 threads = 1024
-run: 139336220
+time = 139.336220
 blocks = 1024
 threads = 1024
-run: 142516288
+time = 142.516288

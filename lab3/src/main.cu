@@ -70,7 +70,6 @@ __global__ void kernel(
 }
 
 __global__ void calc_centers(
-    uchar4* data, size_t n,
     float4* new_centers, ulonglong4* cache, uint32_t n_classes,
     unsigned long long* equal)
 {
@@ -129,11 +128,11 @@ void launch_k_means(uchar4* host_data, const size_t w, const size_t h, const Cen
         free(tmp_centers);
     }
 
-    unsigned long long equal = 0,
+    unsigned long long equal = 1,
                        *dev_equal;
     CSC(cudaMalloc(&dev_equal, sizeof(unsigned long long)));
 
-    while (true) {
+    while (equal != 0) {
         CSC(cudaMemcpyToSymbol(dev_centers, dev_next_centers, sizeof(float4) * n_classes, 0, cudaMemcpyDeviceToDevice));
 
         CSC(cudaMemset(dev_equal, 0, sizeof(unsigned long long)));
@@ -143,14 +142,10 @@ void launch_k_means(uchar4* host_data, const size_t w, const size_t h, const Cen
             dev_data, n, dev_cache, n_classes)));
 
         START_KERNEL((calc_centers<<<1, n_classes>>>(
-            dev_data, n,
             dev_next_centers, dev_cache, n_classes,
             dev_equal)));
 
         CSC(cudaMemcpy(&equal, dev_equal, sizeof(unsigned long long), cudaMemcpyDeviceToHost));
-        if (equal == 0) {
-            break;
-        }
     }
 
     CSC(cudaFree(dev_equal));
