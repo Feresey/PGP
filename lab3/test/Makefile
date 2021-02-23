@@ -20,6 +20,8 @@ BINS   = $(BINARY_INPUT) $(BINARY_WANT)
 HEXS   = $(HEX_INPUT) $(HEX_RESULT)
 IMAGES = $(IMAGE_INPUT) $(IMAGE_RESULT)
 
+DIFFS = $(addprefix test-,$(RESULT))
+
 .PHONY: all test images clean
 all: test
 	
@@ -28,8 +30,11 @@ clean:
 
 run: $(IMAGES)
 
-DIFFS = $(addprefix test-,$(RESULT))
+ifeq ($(BENCH), on)
+test: $(BINARY_RESULT)
+else
 test: $(DIFFS)
+endif
 
 images: $(IMAGES)
 

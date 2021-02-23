@@ -1,0 +1,55 @@
+blocks = 1
+threads = 32
+run: 201184063
+blocks = 1
+threads = 32
+run: 84191246064
+===
+blocks = 16
+threads = 16
+run: 290349113
+blocks = 16
+threads = 16
+run: 7494419552
+===
+blocks = 32
+threads = 32
+run: 2561765715
+blocks = 32
+threads = 32
+run: 3855833430
+===
+blocks = 32
+threads = 64
+run: 296941000
+blocks = 32
+threads = 64
+run: 4167838969
+blocks = 64
+threads = 64
+run: 146438572
+blocks = 64
+threads = 64
+run: 5816296628
+===
+blocks = 64
+threads = 128
+run: 140186692
+blocks = 64
+threads = 128
+run: 3968485597
+===
+blocks = 128
+threads = 1024
+run: 139336220
+blocks = 128
+threads = 1024
+run: 3962384164
+===
+blocks = 1024
+threads = 1024
+run: 142516288
+blocks = 1024
+threads = 1024
+run: 3965347436
+=

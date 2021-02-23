@@ -28,7 +28,7 @@ NVCCFLAGS += -Wno-deprecated-declarations
 
 ifeq ($(BENCH),on)
 GCCFLAGS   = -O3
-# NVCCFLAGS += -DBENCHMARK
+NVCCFLAGS += -DBENCHMARK
 NVCCFLAGS += -O3
 else
 GCCFLAGS   = -g3
@@ -67,7 +67,7 @@ $(BUILDDIR) $(BINDIR) $(SEND_DIR) $(SEND_TARGET_DIR):
 
 .PHONY: test
 test: $(TARGET_BIN) | $(CONVERT_TOOL)
-	$(MAKE) -j1 -C test TEST_TOOL="$(PREFIX) $^"
+	$(MAKE) -j1 -C test TEST_TOOL="$(PREFIX) $^ $(SUFFIX)"
 
 .PHONY: send
 send: | $(SEND_DIR) $(SEND_TARGET_DIR)

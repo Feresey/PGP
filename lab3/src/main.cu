@@ -6,11 +6,10 @@
 #include "helpers.cuh"
 
 #define EPS 1e-3
-#define IN_EPS(EQ) (abs(EQ) < EPS)
 
 //| да, костыль|
-dim3 blocks = 1;
-dim3 threads = 32;
+int blocks = 1;
+int threads = 32;
 
 __device__ __constant__ float4 dev_centers[500];
 
@@ -51,11 +50,10 @@ __device__ int calc_best_distance(const uchar4& point, const int n_classes)
 //| классификация пикселей по текущим центрам групп.|
 __global__ void kernel(
     uchar4* data, size_t n,
-    float4* new_centers, ulonglong4* cache, uint32_t n_classes,
-    unsigned long long* equal)
+    ulonglong4* cache, uint32_t n_classes)
 {
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
-    int offset = blockDim.x * gridDim.x;
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    int offset = gridDim.x * blockDim.x;
 
     for (size_t i = id; i < n; i += offset) {
         uchar4& elem = data[i];
@@ -69,8 +67,16 @@ __global__ void kernel(
         atomicAdd(&cache_elem->z, elem.z);
         atomicAdd(&cache_elem->w, 1);
     }
+}
 
-    __syncthreads();
+__global__ void calc_centers(
+    uchar4* data, size_t n,
+    float4* new_centers, ulonglong4* cache, uint32_t n_classes,
+    unsigned long long* equal)
+{
+    int id = threadIdx.x + blockIdx.x * blockDim.x;
+    int offset = gridDim.x * blockDim.x;
+
     //| присваивание новых значений центров классов.|
     for (uint32_t i = id; i < n_classes; i += offset) {
         ulonglong4 cache_elem = cache[i];
@@ -83,23 +89,10 @@ __global__ void kernel(
 
         //| условие сходимости -- центры не изменились|
         float4 old = dev_centers[i];
-        if (norm(old, elem) > EPS) {
+        float diff = norm(old, elem);
+        if (diff > EPS) {
             atomicAdd(equal, 1);
         }
-    }
-}
-
-__global__ void debug(uchar4* data, const size_t n)
-{
-    int id = blockDim.x * blockIdx.x + threadIdx.x;
-    int offset = blockDim.x * gridDim.x;
-
-    for (size_t i = id; i < n; i += offset) {
-        uchar4& p = data[i];
-        float4 pp = dev_centers[p.w];
-        p.x = (unsigned char)pp.x;
-        p.y = (unsigned char)pp.y;
-        p.z = (unsigned char)pp.z;
     }
 }
 
@@ -146,7 +139,10 @@ void launch_k_means(uchar4* host_data, const size_t w, const size_t h, const Cen
         CSC(cudaMemset(dev_equal, 0, sizeof(unsigned long long)));
         CSC(cudaMemset(dev_cache, 0, sizeof(ulonglong4) * n_classes));
 
-        START_KERNEL((kernel<<<blocks, threads>>>(
+        START_KERNEL((kernel<<<dim3(blocks, 1, 1), dim3(threads, 1, 1)>>>(
+            dev_data, n, dev_cache, n_classes)));
+
+        START_KERNEL((calc_centers<<<1, n_classes>>>(
             dev_data, n,
             dev_next_centers, dev_cache, n_classes,
             dev_equal)));
@@ -164,16 +160,37 @@ void launch_k_means(uchar4* host_data, const size_t w, const size_t h, const Cen
     CSC(cudaFree(dev_cache));
 }
 
-int main()
+#include <time.h>
+
+// call this function to start a nanosecond-resolution timer
+struct timespec timer_start()
 {
+    struct timespec start_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
+    return start_time;
+}
+
+// call this function to end a timer, returning nanoseconds elapsed as a long
+unsigned long long timer_end(struct timespec start_time)
+{
+    struct timespec end_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end_time);
+    unsigned long long diffInNanos = (unsigned long long)(end_time.tv_sec - start_time.tv_sec) * (unsigned long long)1e9 + (unsigned long long)(end_time.tv_nsec - start_time.tv_nsec);
+    return diffInNanos;
+}
+
 #ifdef BENCHMARK
-    for (int i = 1; i < argc; i += 2) {
+int main(int argc, char** argv)
+{
+    for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-blocks") == 0) {
-            blocks = atoi(argv[i + 1]);
+            blocks = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-threads") == 0) {
-            threads = atoi(argv[i + 1]);
+            threads = atoi(argv[++i]);
         }
     }
+#else
+int main()
 #endif
 
     char input[PATH_MAX], output[PATH_MAX];
@@ -201,7 +218,11 @@ int main()
     read_image(in, &data, &w, &h);
     fclose(in);
 
+    fprintf(stderr, "blocks = %d\nthreads = %d\n", blocks, threads);
+
+    struct timespec start_time = timer_start();
     launch_k_means(data, w, h, centers, n_classes);
+    fprintf(stderr, "run: %lld\n", timer_end(start_time));
 
     FILE* out = fopen(output, "wb");
     write_image(out, data, w, h);
