@@ -45,7 +45,7 @@ func NewImage(r io.Reader, w, h uint32) (image.Image, error) {
 				R: buf[0],
 				G: buf[1],
 				B: buf[2],
-				A: buf[3],
+				A: 255,
 			}
 			if err != nil {
 				if errors.Is(err, io.EOF) {
