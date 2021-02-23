@@ -25,6 +25,7 @@ run: 296941000
 blocks = 32
 threads = 64
 run: 4167838969
+===
 blocks = 64
 threads = 64
 run: 146438572
@@ -52,4 +53,4 @@ run: 142516288
 blocks = 1024
 threads = 1024
 run: 3965347436
-=
+===
