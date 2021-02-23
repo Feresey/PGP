@@ -70,47 +70,51 @@ $nc <= 32$.
 \listsource{../src}{main.cu}
 }
 
+\newpage
+
 \se{Результаты}
 
-% \begin{figure}[tbh]
-% 	\caption*{Малое изображение: 400x408}
-% 	\begin{subfigure}{0.49\textwidth}
-% 		\centering
-% 		\caption*{Исходное изображение}
-% 		\includegraphics[scale=0.4]{../test/images/nigger.png}
-% 	\end{subfigure}
-% 	\begin{subfigure}{0.49\textwidth}
-% 		\centering
-% 		\caption*{Результат:}
-% 		\includegraphics[scale=0.4]{../test/t3/res.png}
-% 	\end{subfigure}
-% \end{figure}
+\begin{figure}[!tbh]
+	\caption*{Малое изображение: 400x408}
+	\begin{subfigure}{0.49\textwidth}
+		\centering
+		\caption*{Исходное изображение}
+		\includegraphics[scale=0.4]{../test/images/nigger.png}
+	\end{subfigure}
+	\begin{subfigure}{0.49\textwidth}
+		\centering
+		\caption*{Результат:}
+		\includegraphics[scale=0.4]{../test/t3/res.png}
+	\end{subfigure}
+\end{figure}
 
-% Были выделены пиксели с отдельных лепестков и из центральной области.
+Были выделены пиксели с отдельных лепестков и из центральной области.
 
-% \begin{figure}[tbh]
-% 	\caption*{Большое изображение: 6000x4000}
-% 	\begin{subfigure}{0.49\textwidth}
-% 		\centering
-% 		\caption*{Исходное изображение}
-% 		\includegraphics[scale=0.159]{../test/images/pumpkin.png}
-% 	\end{subfigure}
-% 	\begin{subfigure}{0.49\textwidth}
-% 		\centering
-% 		\caption*{Результат:}
-% 		\includegraphics[scale=0.038]{../test/t4/res.png}
-% 	\end{subfigure}
-% \end{figure}
+\begin{figure}[!tbh]
+	\caption*{Большое изображение: 6000x4000}
+	\begin{subfigure}{0.49\textwidth}
+		\centering
+		\caption*{Исходное изображение}
+		\includegraphics[scale=0.159]{../test/images/pumpkin.png}
+	\end{subfigure}
+	\begin{subfigure}{0.49\textwidth}
+		\centering
+		\caption*{Результат:}
+		\includegraphics[scale=0.038]{../test/t4/res.png}
+	\end{subfigure}
+\end{figure}
 
 Были выделены пиксели на облаке, чистом небе, тыкве и соломе.
 Но так получилось что цвет соломы оказался несколько ближе к цвету тыквы.
+
+\newpage
 
 \textit{Время указано в миллисекундах}
 
 Малое изображение:
 
 \begin{center}
-	cpu time = 5.29322
+	cpu time = 6.437255
 	\begin{table*}[!htb]
 		\centering
 		\begin{tabular}{|c|c|c|}
@@ -134,7 +138,7 @@ $nc <= 32$.
 Большое изображение:
 
 \begin{center}
-	cpu time = 605.091354
+	cpu time = 4737.693401
 	\begin{table*}[!htb]
 		\centering
 		\begin{tabular}{|c|c|c|}
@@ -155,16 +159,14 @@ $nc <= 32$.
 	\end{table*}
 \end{center}
 
-
-
 \se{Выводы}
 
-Я понял что обрабатывать изображения на CPU плохая идея, если даже на одном небольшом изображении
-разница получилась в 64 раза.
+Тут разрыв с CPU не столь явный, скорее всего виноваты атомарные операции сложения,
+потому что из за малого количества классов они будут обращаться к одной и той же памяти
+последовательно.
 
-Конкретно выделение контуров было мне нужно для подготовки данных для обучения нейросети.
-Нужно было разделить изображение на несколько по указанным линиям.
-Правда там я использовал повышение контраста и резкости,
-но чувствую было бы проще если бы я использовал предназначенный для этого алгоритм.
+Ну главное что оно работает.
+
+В будущем постараюсь столь плохо не делать.
 
 \end{document}
