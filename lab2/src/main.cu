@@ -83,9 +83,6 @@ __global__ void kernel(uchar4* out, uint32_t w, uint32_t h)
 
             float res = prewitt(z);
             unsigned char res_byte = res;
-            if (res < 0) {
-                printf("ERROR: ты обосрался: %f\n", res);
-            }
             if (res > 255) {
                 res_byte = 255;
             }
