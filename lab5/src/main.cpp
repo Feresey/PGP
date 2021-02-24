@@ -10,9 +10,6 @@
 
 #define BLOCK_SIZE 1024
 
-// попытка выровнять блоки
-#define THREAD_INDEX(idx) ((WARP_SIZE + 1) * ((idx) / WARP_SIZE) + ((idx) % WARP_SIZE))
-
 #define SWAP_IF(arr, x, y) \
     if (arr[x] > arr[y])   \
     SWAP(arr, x, y)
@@ -122,12 +119,14 @@ struct timespec timer_start()
     return start_time;
 }
 
+typedef unsigned long long ull;
+
 // call this function to end a timer, returning nanoseconds elapsed as a long
-long timer_end(struct timespec start_time)
+ull timer_end(struct timespec start_time)
 {
     struct timespec end_time;
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end_time);
-    long diffInNanos = (end_time.tv_sec - start_time.tv_sec) * (long)1e9 + (end_time.tv_nsec - start_time.tv_nsec);
+    ull diffInNanos = (ull)(end_time.tv_sec - start_time.tv_sec) * (ull)1e9 + (ull)(end_time.tv_nsec - start_time.tv_nsec);
     return diffInNanos;
 }
 
@@ -146,7 +145,7 @@ int main()
 
     struct timespec start_time = timer_start();
     sort(arr, size);
-    fprintf(stderr, "sort time: %ld\n", timer_end(start_time));
+    fprintf(stderr, "sort time: %lld\n", timer_end(start_time));
     fwrite(arr, sizeof(int), size, stdout);
 
     free(arr);

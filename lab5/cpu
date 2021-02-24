@@ -1,0 +1,18 @@
+cat t1/in.bin | /home/lol/Desktop/Labs/PGP/lab5/bin/lab5 > t1/res.bin
+sort time: 623824
+diff -q t1/want.hex t1/res.hex
+cat t2/in.bin | /home/lol/Desktop/Labs/PGP/lab5/bin/lab5 > t2/res.bin
+sort time: 9101413
+diff -q t2/want.hex t2/res.hex
+cat t3/in.bin | /home/lol/Desktop/Labs/PGP/lab5/bin/lab5 > t3/res.bin
+sort time: 789445012
+diff -q t3/want.hex t3/res.hex
+cat t4/in.bin | /home/lol/Desktop/Labs/PGP/lab5/bin/lab5 > t4/res.bin
+sort time: 13736742
+diff -q t4/want.hex t4/res.hex
+cat t5/in.bin | /home/lol/Desktop/Labs/PGP/lab5/bin/lab5 > t5/res.bin
+sort time: 774255989
+diff -q t5/want.hex t5/res.hex
+cat t6/in.bin | /home/lol/Desktop/Labs/PGP/lab5/bin/lab5 > t6/res.bin
+sort time: 70896706258
+diff -q t6/want.hex t6/res.hex
