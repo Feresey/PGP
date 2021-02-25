@@ -2,67 +2,69 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"io"
-	"log"
-	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"text/template"
+
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	var (
-		output string
-		input  string
-		skip   int
-		sort   string
-		desc   bool
-	)
-	flag.StringVar(&input, "i", "", "Input file")
-	flag.StringVar(&output, "o", "", "Output file")
-	flag.IntVar(&skip, "skip", 0, "Number of lines to skip from beginning of the file")
-	flag.StringVar(&sort, "sort", "", "Column to sort by")
-	flag.BoolVar(&desc, "desc", false, "Sort order")
-	flag.Parse()
+type tableTool struct {
+	output string
+	input  string
+	skip   int
+	sort   string
+	delim  string
+	desc   bool
+	num    bool
+}
 
+func newTableCommand() *cobra.Command {
+	var t tableTool
+	cmd := &cobra.Command{
+		Use:  "table",
+		RunE: t.RunE,
+	}
+	t.flags(cmd)
+	return cmd
+}
+
+func (t *tableTool) flags(cmd *cobra.Command) {
+	flags := cmd.Flags()
+
+	flags.StringVarP(&t.input, "input", "i", "", "Input file")
+	flags.StringVarP(&t.output, "output", "o", "", "Output file")
+	flags.IntVar(&t.skip, "skip", 0, "Number of lines to skip from beginning of the file")
+	flags.StringVarP(&t.sort, "sort", "s", "", "Column to sort by")
+	flags.StringVarP(&t.delim, "delimiter", "d", "=", "Delimiter character")
+	flags.BoolVar(&t.desc, "desc", false, "Sort order")
+	flags.BoolVar(&t.num, "num", false, "Sort numbers")
+}
+
+func (t *tableTool) RunE(cmd *cobra.Command, args []string) error {
 	tb := Table{
 		columnsIndex: make(map[string]int),
 	}
 
-	var in io.Reader = os.Stdin
-	if input != "" {
-		ifile, err := os.Open(input)
-		if err != nil {
-			log.Fatalf("open input: %v", err)
+	return openTwo(t.input, t.output, func(r io.Reader, w io.Writer) error {
+		if err := tb.Parse(r, t.skip, t.delim); err != nil {
+			return fmt.Errorf("scan: %w", err)
 		}
-		defer ifile.Close()
-		in = ifile
-	}
 
-	if err := tb.Parse(in, skip); err != nil {
-		log.Fatalf("scan: %v", err)
-	}
-
-	var out io.Writer = os.Stdout
-	if output != "" {
-		file, err := os.Create(output)
-		if err != nil {
-			log.Fatalf("create output: %v", err)
+		if t.sort != "" {
+			tb.Sort(t.sort, !t.desc, t.num)
 		}
-		defer file.Close()
-		out = file
-	}
 
-	if sort != "" {
-		tb.Sort(sort, !desc)
-	}
+		tb.Lines = transponse(tb.Lines)
+		if err := tb.Format(w); err != nil {
+			return fmt.Errorf("write: %w", err)
+		}
 
-	tb.Lines = transponse(tb.Lines)
-	if err := tb.Format(out); err != nil {
-		log.Fatalf("write: %v", err)
-	}
+		return nil
+	})
 }
 
 type Table struct {
@@ -83,14 +85,14 @@ func (tb *Table) AddToColumn(key, value string) {
 	tb.Lines[idx] = append(tb.Lines[idx], value)
 }
 
-func (tb *Table) Parse(r io.Reader, skip int) error {
+func (tb *Table) Parse(r io.Reader, skip int, delim string) error {
 	scan := bufio.NewScanner(r)
 	for scan.Scan() {
 		if skip > 0 {
 			skip--
 			continue
 		}
-		vals := strings.Split(scan.Text(), "=")
+		vals := strings.Split(scan.Text(), delim)
 		if len(vals) != 2 {
 			return fmt.Errorf("incorrect format: %q", scan.Text())
 		}
@@ -159,14 +161,14 @@ func counter() func() int {
 	}
 }
 
-func (tb *Table) Sort(column string, ascending bool) {
+func (tb *Table) Sort(column string, ascending, asNum bool) {
 	idx, ok := tb.columnsIndex[column]
 	if !ok {
 		println("no such column:", column)
 		return
 	}
 
-	swapIndexes := swapIndex(tb.Lines[idx], ascending)
+	swapIndexes := swapIndex(tb.Lines[idx], ascending, asNum)
 
 	for lineNum := range tb.Lines {
 		line := tb.Lines[lineNum]
@@ -182,6 +184,7 @@ type sortIndex struct {
 	lines     []string
 	indexes   []int
 	ascending bool
+	asNum     bool
 }
 
 func (a sortIndex) Len() int { return len(a.lines) }
@@ -189,14 +192,24 @@ func (a sortIndex) Swap(i, j int) {
 	a.lines[i], a.lines[j] = a.lines[j], a.lines[i]
 	a.indexes[i], a.indexes[j] = a.indexes[j], a.indexes[i]
 }
+
 func (a sortIndex) Less(i, j int) bool {
-	if a.ascending {
-		return a.lines[i] < a.lines[j]
+	var res bool
+	if a.asNum {
+		x, _ := strconv.ParseFloat(a.lines[i], 64)
+		y, _ := strconv.ParseFloat(a.lines[j], 64)
+		res = x < y
+	} else {
+		res = a.lines[i] < a.lines[j]
 	}
-	return a.lines[i] > a.lines[j]
+	if a.ascending {
+		return res
+	} else {
+		return !res
+	}
 }
 
-func swapIndex(ss []string, ascending bool) []int {
+func swapIndex(ss []string, ascending bool, asNum bool) []int {
 	scp := make([]string, len(ss))
 	copy(scp, ss)
 
@@ -209,6 +222,7 @@ func swapIndex(ss []string, ascending bool) []int {
 		lines:     scp,
 		indexes:   indexes,
 		ascending: ascending,
+		asNum:     asNum,
 	}
 
 	sort.Stable(tosort)

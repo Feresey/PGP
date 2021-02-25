@@ -8,7 +8,7 @@
 #define BLOCK_SIZE 1024
 #define WARP_SIZE 32
 
-// попытка выровнять блоки
+//| попытка выровнять блоки|
 #define THREAD_INDEX(idx) ((WARP_SIZE + 1) * ((idx) / WARP_SIZE) + ((idx) % WARP_SIZE))
 
 #define SWAP_IF(arr, x, y) \
@@ -17,7 +17,7 @@
 
 __global__ void sort_blocks_even_odd(int* dev_arr)
 {
-    // хвостик от выравнивания банков
+    //| хвостик от выравнивания банков|
     __shared__ int shared[THREAD_INDEX(BLOCK_SIZE + 1)];
 
     const unsigned int thread_id = threadIdx.x,
@@ -41,7 +41,7 @@ __global__ void sort_blocks_even_odd(int* dev_arr)
     swap2 = THREAD_INDEX(swap2);
     swap3 = THREAD_INDEX(swap3);
 
-    // да, я знаю что тут конфликт
+    //| да, я знаю что тут конфликт|
     __syncthreads();
     for (int i = 0; i < BLOCK_SIZE; ++i) {
         __syncthreads();
@@ -108,7 +108,7 @@ uint32_t nearest_size(const uint32_t num, const uint32_t prod)
 
 void sort(int* arr, const uint32_t n)
 {
-    // размер, кратный размеру блока
+    //| размер, кратный размеру блока|
     const uint32_t dev_n = nearest_size(n, BLOCK_SIZE);
     const uint32_t n_blocks = dev_n / BLOCK_SIZE;
 
@@ -116,38 +116,38 @@ void sort(int* arr, const uint32_t n)
     CSC(cudaMalloc(&dev_arr, dev_n * sizeof(int)));
     CSC(cudaMemcpy(dev_arr, arr, n * sizeof(int), cudaMemcpyHostToDevice));
 
-    // гарантия что элементы, которые получились из за расширения окажутся в начале отсортированного массива
+    //| гарантия что элементы, которые получились из за расширения окажутся в начале отсортированного массива|
     START_KERNEL((dummy_memset<<<1, BLOCK_SIZE>>>(dev_arr + n, (dev_n - n), INT_MIN)));
 
     fprintf(stderr, "n: %d, dev_n: %d, n_blocks: %d, bs: %d\n", n, dev_n, n_blocks, BLOCK_SIZE / 2);
-    // предварительная сортировка блоков
+    //| предварительная сортировка блоков|
     START_KERNEL((sort_blocks_even_odd<<<n_blocks, BLOCK_SIZE / 2>>>(dev_arr)));
 
-    // ну если массив влез в 1 блок то зачем его сортировать ещё раз?
+    //| ну если массив влез в 1 блок то зачем его сортировать ещё раз?|
     if (n_blocks == 1) {
         goto END;
     }
 
-    // Тут есть n_blocks отсортированных неубывающих последовательностей.
-    // Чтобы все элементы встали на свои места, будут сортироваться половинки блоков:
-    // Правая половина первого и левая половина второго; правая половина второго и левая третьего; ...
-    // Чудесное совпадение, что битоническое слияние как раз на такое и рассчитано.
+    //| Тут есть $n_blocks$ отсортированных неубывающих последовательностей.|
+    //| Чтобы все элементы встали на свои места, будут сортироваться половинки блоков:|
+    //| Правая половина первого и левая половина второго; правая половина второго и левая третьего; ...|
+    //| Чудесное совпадение, что битоническое слияние как раз на такое и рассчитано.|
     for (uint32_t iter = 0; iter < n_blocks; ++iter) {
-        // BLOCK_SIZE/2 потому что каждый поток владеет
-        // одним элементом от первого отсортированного блока и одним от второго
+        //| $BLOCK_SIZE/2$ потому что каждый поток владеет|
+        //| одним элементом от первого отсортированного блока и одним от второго|
         START_KERNEL((bitonic_merge<<<n_blocks - 1, BLOCK_SIZE / 2>>>(dev_arr + BLOCK_SIZE / 2)));
         START_KERNEL((bitonic_merge<<<n_blocks, BLOCK_SIZE / 2>>>(dev_arr)));
     }
 
 END:
-    // обрезание хвостика, который добавлялся для выравнивания. Можно было конечно вписать INT_MAX, но так не интересно.
+    //| обрезание хвостика, который добавлялся для выравнивания. Можно было конечно вписать $INT_MAX$, но так не интересно.|
     CSC(cudaMemcpy(arr, dev_arr + (dev_n - n), n * sizeof(int), cudaMemcpyDeviceToHost));
     CSC(cudaFree(dev_arr));
 }
 
 #include <time.h>
 
-// call this function to start a nanosecond-resolution timer
+//| call this function to start a nanosecond-resolution timer|
 struct timespec timer_start()
 {
     struct timespec start_time;
@@ -155,7 +155,7 @@ struct timespec timer_start()
     return start_time;
 }
 
-// call this function to end a timer, returning nanoseconds elapsed as a long
+//| call this function to end a timer, returning nanoseconds elapsed as a long|
 long timer_end(struct timespec start_time)
 {
     struct timespec end_time;
@@ -166,9 +166,9 @@ long timer_end(struct timespec start_time)
 
 int main()
 {
-    // как же неудобно работать с little/big endian в СИ
+    //| как же неудобно работать с little/big endian в СИ|
     uint32_t size = scan_4();
-    if (size == 0) { // foolproof
+    if (size == 0) { //| foolproof|
         return 0;
     }
 

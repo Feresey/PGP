@@ -1,38 +1,12 @@
-nvcc --std=c++11 -Werror cross-execution-space-call -arch=sm_35 -Wno-deprecated-gpu-targets -D_FORCE_INLINES -Xcompiler -fPIC -Wno-deprecated-declarations -O3 --compiler-options "-O3" -c /home/lol/pgp/lab5/src/main.cu -o /home/lol/pgp/lab5/build/main.cu.o
-nvcc --std=c++11 -Werror cross-execution-space-call -arch=sm_35 -Wno-deprecated-gpu-targets -D_FORCE_INLINES -Xcompiler -fPIC -Wno-deprecated-declarations -O3 --compiler-options "-O3" -c /home/lol/pgp/lab5/src/helpers.c -o /home/lol/pgp/lab5/build/helpers.c.o
-nvcc --std=c++11 -Werror cross-execution-space-call -arch=sm_35 -Wno-deprecated-gpu-targets -D_FORCE_INLINES -Xcompiler -fPIC -Wno-deprecated-declarations -O3 --compiler-options "-O3" -lm /home/lol/pgp/lab5/build/main.cu.o /home/lol/pgp/lab5/build/helpers.c.o -o /home/lol/pgp/lab5/bin/lab5
-make -j1 -C test TEST_TOOL=" /home/lol/pgp/lab5/bin/lab5"
-make[1]: предупреждение: в суб-Makefile принудительно задан -j1; сброс режима сервера заданий
-make[1]: вход в каталог «/home/lol/pgp/lab5/test»
-cat t1/in.bin | /home/lol/pgp/lab5/bin/lab5 > t1/res.bin
-n: 10, dev_n: 1024, n_blocks: 1, bs: 512
-sort time: 269320362
-diff -q t1/want.hex t1/res.hex
-cat t2/in.bin | /home/lol/pgp/lab5/bin/lab5 > t2/res.bin
-n: 8123, dev_n: 8192, n_blocks: 8, bs: 512
-sort time: 247722819
-diff -q t2/want.hex t2/res.hex
-cat t3/in.bin | /home/lol/pgp/lab5/bin/lab5 > t3/res.bin
-n: 100500, dev_n: 101376, n_blocks: 99, bs: 512
-sort time: 204694692
-diff -q t3/want.hex t3/res.hex
-cat t4/in.bin | /home/lol/pgp/lab5/bin/lab5 > t4/res.bin
-n: 10000, dev_n: 10240, n_blocks: 10, bs: 512
-sort time: 178349589
-diff -q t4/want.hex t4/res.hex
-Файлы t4/want.hex и t4/res.hex различаются
-make[1]: [Makefile:30: test-t4] Ошибка 1 (игнорирование)
-cat t5/in.bin | /home/lol/pgp/lab5/bin/lab5 > t5/res.bin
-n: 100000, dev_n: 100352, n_blocks: 98, bs: 512
-sort time: 193055952
-diff -q t5/want.hex t5/res.hex
-Файлы t5/want.hex и t5/res.hex различаются
-make[1]: [Makefile:30: test-t5] Ошибка 1 (игнорирование)
-cat t6/in.bin | /home/lol/pgp/lab5/bin/lab5 > t6/res.bin
-n: 1000000, dev_n: 1000448, n_blocks: 977, bs: 512
-sort time: 1527011376
-diff -q t6/want.hex t6/res.hex
-Файлы t6/want.hex и t6/res.hex различаются
-make[1]: [Makefile:30: test-t6] Ошибка 1 (игнорирование)
-make[1]: выход из каталога «/home/lol/pgp/lab5/test»
-Time: 0h:00m:25s
+n: 10
+time: 269.320362
+n: 8123
+time: 247.722819
+n: 100500
+time: 204.694692
+n: 10000
+time: 178.349589
+n: 100000
+time: 193.055952
+n: 1000000
+time: 1527.011376

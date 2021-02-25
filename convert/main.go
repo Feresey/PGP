@@ -14,7 +14,8 @@ type command struct {
 
 func New() *cobra.Command {
 	c := new(command)
-	cmd := &cobra.Command{
+	root := &cobra.Command{}
+	convert := &cobra.Command{
 		Use: "convert",
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			switch c.mode {
@@ -27,11 +28,13 @@ func New() *cobra.Command {
 			}
 		},
 	}
-	c.flags(cmd, nil)
+	c.flags(convert, nil)
 
-	cmd.AddCommand(c.imageCommand(), c.hexCommand(), c.hexArrayCommand(), c.pixelsCommand())
+	convert.AddCommand(c.imageCommand(), c.hexCommand(), c.hexArrayCommand(), c.pixelsCommand())
 
-	return cmd
+	root.AddCommand(convert, newTableCommand())
+
+	return root
 }
 
 func (c *command) flags(cmd *cobra.Command, args []string) {
