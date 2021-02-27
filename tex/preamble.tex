@@ -30,6 +30,10 @@
 	\subsection*{\textbf{#2}}
 	\lstinputlisting[language=c++]{#1/#2}
 }
+\newcommand{\listtext}[2]{
+	\subsection*{\textbf{#2}}
+	\lstinputlisting[basicstyle=\tiny]{#1/#2}
+}
 
 \lstdefinestyle{empty}{language=c++,
 	basicstyle=\scriptsize,
@@ -50,7 +54,6 @@
 	breaklines=true,
 	frame=L,
 	xleftmargin=\parindent,
-	language=c++,
 	numbers=left,
 	showstringspaces=false,
 	basicstyle=\footnotesize\ttfamily,
