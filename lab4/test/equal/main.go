@@ -27,7 +27,7 @@ func main() {
 	}
 	defer want.Close()
 
-	res, err := os.Create(resName)
+	res, err := os.Open(resName)
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +43,7 @@ func main() {
 	}
 
 	if err := equalMatrix(wantArr, resArr); err != nil {
-		println(err)
+		println(err.Error())
 	}
 }
 
@@ -81,7 +81,7 @@ func equalMatrix(a, b [][]float64) error {
 	}
 	for i, line := range a {
 		for j := range line {
-			if math.Abs(a[i][j]-b[i][j]) < 1e-8 {
+			if math.Abs(a[i][j]-b[i][j]) > 1e-8 {
 				return fmt.Errorf("numbers mismatch: [%d;%d] %f %f", i, j, a[i][j], b[i][j])
 			}
 		}

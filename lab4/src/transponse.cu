@@ -14,23 +14,18 @@ __global__ void transponse_kernel(
                idy = blockDim.y * blockIdx.y + threadIdx.y;
     const uint idx_T = blockDim.x * blockIdx.x + threadIdx.y,
                idy_T = blockDim.y * blockIdx.y + threadIdx.x;
-    const bool allow = idx < n && idy < m;
 
     __shared__ double shared[32][32 + 1];
 
-    // if (tid_x == 0 && tid_y == 2) {
-    //     printf("n: %d, m: %d\n", n, m);
-    //     printf("(%d %d):(%d %d)\n", tid_x, tid_y, idx, idy);
-    // }
-
-    if (allow) {
-        // printf("%d %d: %f\n", idx, idy, A[idy * m + idx]);
-        shared[tid_x][tid_y] = A[idy * m + idx];
+    if (idx < n && idy < m) {
+        shared[tid_x][tid_y] = A[idx * m + idy];
+        // printf("idx  : %d\tidy  : %d\t%lf\n", idx, idy, shared[tid_x][tid_y]);
     }
 
     __syncthreads();
-    if (allow) {
-        out[idx_T * n + idy_T] = shared[tid_y][tid_x];
+    if (idy < n && idx < m) {
+        // printf("idx_t: %d\tidy_t: %d\t%lf\n", idx_T, idy_T, shared[tid_y][tid_x]);
+        out[idy_T * n + idx_T] = shared[tid_y][tid_x];
     }
 }
 
@@ -39,13 +34,16 @@ T div_up(T a, T b) { return (a - 1) / b + 1; }
 
 dev_matrix transponse(const dev_matrix& A, const uint32_t n, const uint32_t m)
 {
-    const double* A_raw = thrust::raw_pointer_cast(&A[0]);
-    dev_matrix A_trans(m * n);
-    double* A_trans_raw = thrust::raw_pointer_cast(&A_trans[0]);
+    const double* raw = thrust::raw_pointer_cast(&A[0]);
+    dev_matrix res(m * n);
+    double* res_raw = thrust::raw_pointer_cast(&res[0]);
     const dim3 blocks = dim3(div_up<uint>(n, 32), div_up<uint>(m, 32));
     const dim3 threads = dim3(32, 32);
 
-    START_KERNEL((transponse_kernel<<<blocks, threads>>>(A_trans_raw, A_raw, n, m)));
+    START_KERNEL((transponse_kernel<<<blocks, threads>>>(res_raw, raw, n, m)));
 
-    return A_trans;
+    // show_matrix(stderr, A, n, m);
+    // show_matrix(stderr, A_trans, m, n);
+
+    return res;
 }
