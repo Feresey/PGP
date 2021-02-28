@@ -47,8 +47,5 @@ dev_matrix transponse(const dev_matrix& A, const uint32_t n, const uint32_t m)
 
     START_KERNEL((transponse_kernel<<<blocks, threads>>>(A_trans_raw, A_raw, n, m)));
 
-    show_matrix(stderr, A, n, m);
-    show_matrix(stderr, A_trans, m, n);
-
     return A_trans;
 }
