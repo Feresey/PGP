@@ -6,36 +6,55 @@ SEND_DIR = $(CURDIR)/send
 $(CONVERT_TOOL):
 	cd $(dir $@) && go build -v
 
-TARGET = lab4
+TARGET = lab5
 TARGET_BIN = $(BINDIR)/$(TARGET)
 SEND_TARGET_DIR = $(SEND_DIR)/$(TARGET)
 
 CXX = nvcc
+CC  = nvcc
 
-CFLAGS += --std=c++14 -Werror cross-execution-space-call
-CFLAGS += -arch=sm_35 -Wno-deprecated-gpu-targets
-CFLAGS += -Wno-deprecated-declarations
-CFLAGS += -G
-CFLAGS += --compiler-options "-Wall -Wextra -g3 -Wunreachable-code -Wno-unused-parameter"
-
+CFLAGS  = -I$(SRCDIR)
 LDFLAGS = -lm
 
-CU_SOURCES  = main.cu kernels.cu solve.cu helpers.cu
-CPP_SOURCES = main.cpp solve.cpp helpers.cpp
-HEADERS     = helpers.cuh kernels.cu
+GCCFLAGS = -Wall -Wextra -g3 \
+			-Wno-sign-compare -Wno-long-long \
+			-Wconversion -Wsign-conversion \
+			-Wunreachable-code -Wno-unused-parameter
+
+NVCCFLAGS += --std=c++14 -Werror cross-execution-space-call
+NVCCFLAGS += -arch=sm_35 -Wno-deprecated-gpu-targets
+NVCCFLAGS += -D_FORCE_INLINES -Xcompiler -fPIC
+NVCCFLAGS += -Wno-deprecated-declarations
+
+ifeq ($(BENCH),on)
+GCCFLAGS   = -O3
+# NVCCFLAGS += -DBENCHMARK
+NVCCFLAGS += -O3
+else
+GCCFLAGS   = -g3
+NVCCFLAGS += -G
+endif
+NVCCFLAGS += --compiler-options "$(GCCFLAGS)"
+
+CU_SOURCES  = transponse.cu
+# C_SOURCES   = helpers.c
+CPP_SOURCES = main.cpp helpers.cpp
+HEADERS     = helpers.cuh
 
 CPP_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CPP_SOURCES)))
-CU_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CU_SOURCES)))
+# C_OBJECTS   = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(C_SOURCES)))
+CU_OBJECTS  = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CU_SOURCES)))
 
 ifeq ($(CUDA),off)
 CXX = g++
-CFLAGS = -Wall -Wextra -Wpedantic -g3 -Wconversion -Wsign-conversion -Wunreachable-code
+CC  = gcc
+CFLAGS = $(GCCFLAGS)
 OBJECTS = $(CPP_OBJECTS)
 else
-OBJECTS = $(CU_OBJECTS)
+CFLAGS = $(NVCCFLAGS)
+OBJECTS = $(CU_OBJECTS) $(CPP_OBJECTS)
 endif
 
-CFLAGS += -I$(SRCDIR)
 
 .PHONY: all clean
 all: $(TARGET)
@@ -48,7 +67,7 @@ $(BUILDDIR) $(BINDIR) $(SEND_DIR) $(SEND_TARGET_DIR):
 
 .PHONY: test
 test: $(TARGET_BIN) | $(CONVERT_TOOL)
-	$(MAKE) -j1 -C test test TEST_TOOL=$^
+	$(MAKE) -j1 -C test TEST_TOOL="$(PREFIX) $^"
 
 .PHONY: send
 send: | $(SEND_DIR) $(SEND_TARGET_DIR)
@@ -72,5 +91,3 @@ $(CU_OBJECTS): $(BUILDDIR)/%.cu.o: $(SRCDIR)/%.cu | $(BUILDDIR)
 
 $(CPP_OBJECTS): $(BUILDDIR)/%.cpp.o: $(SRCDIR)/%.cpp | $(BUILDDIR)
 	$(compile)
-
-

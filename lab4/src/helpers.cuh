@@ -1,8 +1,10 @@
 #ifndef HELPERS_CUH
 #define HELPERS_CUH
 
-#include <stdint.h>
-#include <stdio.h>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstddef>
 
 #define CSC(k)                                                 \
     do {                                                       \
@@ -42,9 +44,6 @@
 
 typedef thrust::host_vector<double> host_matrix;
 typedef thrust::device_vector<double> dev_matrix;
-
-#define BLOCKS dim3(8, 8)
-#define THREADS dim3(8, 8)
 #else
 #include "helpers.hpp"
 #endif
@@ -52,7 +51,6 @@ typedef thrust::device_vector<double> dev_matrix;
 void read_matrix(host_matrix& out, const size_t n, const size_t m);
 void show_matrix(FILE* out, const host_matrix& data, const size_t n, const size_t m);
 
-dev_matrix inverse(const dev_matrix& matrix, const size_t n, const size_t m);
-dev_matrix solve(const dev_matrix& A, const dev_matrix& B, const size_t n, const size_t m, const size_t k);
+dev_matrix transponse(const dev_matrix& matrix, const uint32_t n, const uint32_t m);
 
 #endif // HELPERS_H
