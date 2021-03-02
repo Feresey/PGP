@@ -1,7 +1,7 @@
 CONVERT_TOOL ?= $(CURDIR)/../../convert/convert
 TEST_TOOL    ?= $(CURDIR)/../bin/lab4
 
-TESTDIRS = t1 t2 t3
+TESTDIRS = t1 t2 t3 t4 t5
 TESTS = $(addprefix $(CURDIR)/,$(TESTDIRS))
 
 INPUT  = $(addsuffix /in,$(TESTS))

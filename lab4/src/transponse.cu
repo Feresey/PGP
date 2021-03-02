@@ -15,17 +15,24 @@ __global__ void transponse_kernel(
     const uint idx_T = blockDim.x * blockIdx.x + threadIdx.y,
                idy_T = blockDim.y * blockIdx.y + threadIdx.x;
 
+    // temp
+    // const uint block = blockIdx.x * blockDim.x + blockIdx.y;
+
     __shared__ double shared[32][32 + 1];
 
     if (idx < n && idy < m) {
         shared[tid_x][tid_y] = A[idx * m + idy];
-        // printf("idx  : %d\tidy  : %d\t%lf\n", idx, idy, shared[tid_x][tid_y]);
+        //     printf("%d\tidx  : %d\tidy  : %d\t%lf\n", block, idx, idy, shared[tid_x][tid_y]);
+        // } else {
+        //     printf("%d\tidx  : %d\tidy  : %d\tfailed\n", block, idx, idy);
     }
 
     __syncthreads();
-    if (idy < n && idx < m) {
-        // printf("idx_t: %d\tidy_t: %d\t%lf\n", idx_T, idy_T, shared[tid_y][tid_x]);
+    if (idy_T < m && idx_T < n) {
         out[idy_T * n + idx_T] = shared[tid_y][tid_x];
+        //     printf("%d\tidx_t: %d\tidy_t: %d\t%lf\n", block, idx_T, idy_T, shared[tid_y][tid_x]);
+        // } else {
+        //     printf("%d\tidx_t: %d\tidy_t: %d\tfailed\n", block, idx_T, idy_T);
     }
 }
 
@@ -40,10 +47,9 @@ dev_matrix transponse(const dev_matrix& A, const uint32_t n, const uint32_t m)
     const dim3 blocks = dim3(div_up<uint>(n, 32), div_up<uint>(m, 32));
     const dim3 threads = dim3(32, 32);
 
-    START_KERNEL((transponse_kernel<<<blocks, threads>>>(res_raw, raw, n, m)));
-
     // show_matrix(stderr, A, n, m);
-    // show_matrix(stderr, A_trans, m, n);
+    fprintf(stderr, "n: %d, m: %d\n", n, m);
+    START_KERNEL((transponse_kernel<<<blocks, threads>>>(res_raw, raw, n, m)));
 
     return res;
 }
