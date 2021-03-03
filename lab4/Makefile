@@ -49,6 +49,7 @@ ifeq ($(CUDA),off)
 CXX = g++
 CC  = gcc
 CFLAGS = $(GCCFLAGS)
+CPP_SOURCES += transponse.cpp
 OBJECTS = $(CPP_OBJECTS)
 else
 CFLAGS = $(NVCCFLAGS)

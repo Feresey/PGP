@@ -1,6 +1,6 @@
-#include "helpers.cuh"
-
 #include <assert.h>
+
+#include "helpers.cuh"
 
 void read_matrix(host_matrix& out, const size_t n, const size_t m)
 {
@@ -23,3 +23,7 @@ void show_matrix(FILE* out, const host_matrix& data, const size_t n, const size_
         fprintf(out, "\n");
     }
 }
+
+#ifdef __cplusplus
+void __syncthreads() { }
+#endif

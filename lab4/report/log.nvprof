@@ -1,0 +1,26 @@
+==80567== NVPROF is profiling process 80567, command: /home/lol/pgp/lab4/bin/lab4
+==80567== Warning: Profiling results might be incorrect with current version of nvcc compiler used to compile cuda app. Compile with nvcc compiler 9.0 or later version to get correct profiling results. Ignore this warning if code is already compiled with the recommended nvcc version 
+==80567== Some kernel(s) will be replayed on device 0 in order to collect all events/metrics.
+==80567== Profiling application: /home/lol/pgp/lab4/bin/lab4
+==80567== Profiling result:
+==80567== Event result:
+Invocations                                Event Name         Min         Max         Avg       Total
+Device "GeForce GT 740M (0)"
+    Kernel: transponse_kernel(double*, double const *, unsigned int, unsigned int)
+          1          uncached_global_load_transaction    67108864    67108864    67108864    67108864
+          1                  global_store_transaction    67108864    67108864    67108864    67108864
+          1                        shared_load_replay           0           0           0           0
+          1                       shared_store_replay           0           0           0           0
+
+==80567== Metric result:
+Invocations                               Metric Name                        Metric Description         Min         Max         Avg
+Device "GeForce GT 740M (0)"
+    Kernel: transponse_kernel(double*, double const *, unsigned int, unsigned int)
+          1                  shared_load_transactions                  Shared Load Transactions     5242880     5242880     5242880
+          1                 shared_store_transactions                 Shared Store Transactions     6291456     6291456     6291456
+          1                          gld_transactions                  Global Load Transactions    67108864    67108864    67108864
+          1                          gst_transactions                 Global Store Transactions    67108864    67108864    67108864
+          1                         shared_efficiency                  Shared Memory Efficiency      36.36%      36.36%      36.36%
+          1                            gld_efficiency             Global Memory Load Efficiency      25.00%      25.00%      25.00%
+          1                            gst_efficiency            Global Memory Store Efficiency      25.00%      25.00%      25.00%
+          1                 warp_execution_efficiency                 Warp Execution Efficiency      82.52%      82.52%      82.52%
