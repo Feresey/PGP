@@ -19,7 +19,7 @@ LDFLAGS = -lm
 GCCFLAGS = -Wall -Wextra -g3 \
 			-Wno-sign-compare -Wno-long-long \
 			-Wconversion -Wsign-conversion \
-			-Wunreachable-code -Wno-unused-parameter
+			-Wunreachable-code
 
 NVCCFLAGS += --std=c++14 -Werror cross-execution-space-call
 NVCCFLAGS += -arch=sm_35 -Wno-deprecated-gpu-targets
