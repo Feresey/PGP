@@ -67,7 +67,7 @@ $(BUILDDIR) $(BINDIR) $(SEND_DIR) $(SEND_TARGET_DIR):
 
 .PHONY: test
 test: $(TARGET_BIN) | $(CONVERT_TOOL)
-	$(MAKE) -j1 -C test TEST_TOOL="$(PREFIX) $^"
+	$(MAKE) -j1 -C test TEST_TOOL="$(PREFIX) $^" SKIP_DIFF=$(SKIP_DIFF)
 
 .PHONY: send
 send: | $(SEND_DIR) $(SEND_TARGET_DIR)

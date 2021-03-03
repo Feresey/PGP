@@ -25,8 +25,10 @@ $(TESTDIRS): ;
 
 .PHONY: $(TESTS)
 $(TESTS): %: %/want %/res | $(EQUAL_TOOL)
+ifneq ($(SKIP_DIFF),true)
 	-$(EQUAL_TOOL) --want $(word 1,$^) --result $(word 2,$^)
+endif
 
 .PHONY: $(RESULT) # run always
 $(RESULT): %/res: %/in
-	$(TEST_TOOL) < $^ > $@
+	cd $* && $(TEST_TOOL) < $^ > $@
