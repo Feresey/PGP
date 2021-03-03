@@ -7,9 +7,6 @@
 #define WARP_SIZE 32
 #define HALF_WARP_SIZE 16
 
-// __always_inline __device__ (n < HALF_WARP_SIZE) ? n : n + 1;
-// }
-
 __global__ void transponse_kernel(
     double* out, const double* A,
     const uint32_t n, const uint32_t m)
