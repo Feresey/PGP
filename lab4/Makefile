@@ -18,8 +18,8 @@ LDFLAGS = -lm
 
 GCCFLAGS = -Wall -Wextra -g3 \
 			-Wno-sign-compare -Wno-long-long \
-			-Wconversion -Wsign-conversion \
-			-Wunreachable-code
+			-Wunreachable-code \
+			-Wunused-result -Wunused-but-set-variable
 
 NVCCFLAGS += --std=c++14 -Werror cross-execution-space-call
 NVCCFLAGS += -arch=sm_35 -Wno-deprecated-gpu-targets
@@ -31,7 +31,7 @@ GCCFLAGS   = -O3
 # NVCCFLAGS += -DBENCHMARK
 NVCCFLAGS += -O3
 else
-GCCFLAGS   = -g3
+GCCFLAGS  += -g3
 NVCCFLAGS += -G
 endif
 NVCCFLAGS += --compiler-options "$(GCCFLAGS)"

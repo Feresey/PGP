@@ -1,5 +1,7 @@
 #include "helpers.cuh"
 
+#include <assert.h>
+
 void read_matrix(host_matrix& out, const size_t n, const size_t m)
 {
     size_t junk;
@@ -8,6 +10,8 @@ void read_matrix(host_matrix& out, const size_t n, const size_t m)
             junk = scanf("%lf", &out[i * m + j]);
         }
     }
+    junk = 42;
+    assert(junk == 42);
 }
 
 void show_matrix(FILE* out, const host_matrix& data, const size_t n, const size_t m)
