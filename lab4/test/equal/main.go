@@ -43,7 +43,7 @@ func main() {
 	}
 
 	if err := equalMatrix(wantArr, resArr); err != nil {
-		println(err.Error())
+		println("ERROR: " + err.Error())
 	}
 }
 

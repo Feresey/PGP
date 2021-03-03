@@ -5,65 +5,26 @@
 #include "helpers.cuh"
 
 #define WARP_SIZE 32
-#define SIDE_SIZE 32
 
 __global__ void transponse_kernel(
     double* out, const double* A,
     const uint32_t n, const uint32_t m)
 {
+    uint i = blockIdx.x * WARP_SIZE + threadIdx.x,
+         j = blockIdx.y * WARP_SIZE + threadIdx.y;
+
     __shared__ double shared[WARP_SIZE][WARP_SIZE + 1];
-    uint x = blockIdx.x * WARP_SIZE + threadIdx.x,
-         y = blockIdx.y * WARP_SIZE + threadIdx.y;
 
-#pragma unroll
-    for (int k = 0; k < WARP_SIZE; k += SIDE_SIZE) {
-        if (x < n && y + k < m) {
-            shared[threadIdx.y + k][threadIdx.x] = A[((y + k) * n) + x];
-        }
+    if (i < n && j < m) {
+        shared[threadIdx.x][threadIdx.y] = A[i * m + j];
     }
 
+    i = blockIdx.y * WARP_SIZE + threadIdx.x;
+    j = blockIdx.x * WARP_SIZE + threadIdx.y;
     __syncthreads();
-
-    x = blockIdx.y * WARP_SIZE + threadIdx.x;
-    y = blockIdx.x * WARP_SIZE + threadIdx.y;
-
-#pragma unroll
-    for (int k = 0; k < WARP_SIZE; k += SIDE_SIZE) {
-        if (x < m && y < n) {
-            out[((y + k) * m) + x] = shared[threadIdx.x][threadIdx.y + k];
-        }
+    if (i < m && j < n) {
+        out[i * n + j] = shared[threadIdx.y][threadIdx.x];
     }
-
-    // const uint tid_x = threadIdx.x,
-    //            tid_y = threadIdx.y;
-    // const uint bx = blockIdx.x * WARP_SIZE,
-    //            by = blockIdx.y * WARP_SIZE;
-    // const uint i = blockDim.x * blockIdx.x + threadIdx.x,
-    //            j = blockDim.y * blockIdx.y + threadIdx.y;
-    // const uint idy_T = blockDim.x * blockIdx.x + threadIdx.y,
-    //            idx_T = blockDim.y * blockIdx.y + threadIdx.x;
-
-    // // temp
-    // // const uint bx = blockIdx.x, by = blockIdx.y;
-
-    // __shared__ double shared[WARP_SIZE][WARP_SIZE + 1];
-
-    // if (idx < n && idy < m) {
-    //     shared[tid_x][tid_y] = A[idx * m + idy];
-    //     // printf("%2d %2d in : %02d %02d %lf\n", bx, by, tid_x, tid_y, shared[tid_x][tid_y]);
-    //     //     printf("%d\tidx  : %d\tidy  : %d\t%lf\n", block, idx, idy, shared[tid_x][tid_y]);
-    //     // } else {
-    //     //     printf("%d\tidx  : %d\tidy  : %d\tfailed\n", block, idx, idy);
-    // }
-
-    // __syncthreads();
-    // if (idx_T < m && idy_T < n) {
-    //     out[idx_T * n + idy_T] = shared[tid_y][tid_x];
-    //     // printf("%2d %2d out: %02d %02d %lf\n", bx, by, tid_y, tid_x, shared[tid_y][tid_x]);
-    //     //     printf("%d\tidx_t: %d\tidy_t: %d\t%lf\n", block, idx_T, idy_T, shared[tid_y][tid_x]);
-    //     // } else {
-    //     //     printf("%d\tidx_t: %d\tidy_t: %d\tfailed\n", block, idx_T, idy_T);
-    // }
 }
 
 template <class T>
