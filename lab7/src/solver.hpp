@@ -8,6 +8,20 @@
 
 #define ROOT_RANK 0
 
+#define CSC(call)                                            \
+    do {                                                     \
+        int err = (call);                                    \
+        if (err != MPI_SUCCESS) {                            \
+            char estring[MPI_MAX_ERROR_STRING];              \
+            int len;                                         \
+            MPI_Error_string(err, estring, &len);            \
+            fprintf(stderr, "ERROR in %s:%d. Message: %s\n", \
+                __FILE__, __LINE__, estring);                \
+            MPI_Finalize();                                  \
+            exit(0);                                         \
+        }                                                    \
+    } while (false)
+
 template <class T>
 class dim3 {
     struct dim3_print {

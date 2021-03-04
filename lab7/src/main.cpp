@@ -9,7 +9,11 @@
 #include <string.h>
 #include <time.h>
 
+#include "solver.hpp"
+
 int main(int argc, char** argv)
 {
-    MPI_Init(&argc, &argv);
+    CSC(MPI_Init(&argc, &argv));
+    Solver s(std::cin);
+    CSC(MPI_Finalize());
 }

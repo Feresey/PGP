@@ -4,8 +4,8 @@
 
 Solver::Solver(std::istream& in)
 {
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &n_processes);
+    CSC(MPI_Comm_rank(MPI_COMM_WORLD, &rank));
+    CSC(MPI_Comm_size(MPI_COMM_WORLD, &n_processes));
 
     if (rank == ROOT_RANK) {
         this->read_data(in);
@@ -47,14 +47,14 @@ void Solver::show_data(std::ostream& out)
         << std::endl;
 }
 
-void bcast_int(int* val)
+inline void bcast_int(int* val)
 {
-    MPI_Bcast(val, 1, MPI_INT, ROOT_RANK, MPI_COMM_WORLD);
+    CSC(MPI_Bcast(val, 1, MPI_INT, ROOT_RANK, MPI_COMM_WORLD));
 }
 
-void bcast_double(double* val)
+inline void bcast_double(double* val)
 {
-    MPI_Bcast(val, 1, MPI_DOUBLE, ROOT_RANK, MPI_COMM_WORLD);
+    CSC(MPI_Bcast(val, 1, MPI_DOUBLE, ROOT_RANK, MPI_COMM_WORLD));
 }
 
 void Solver::mpi_bcast()
