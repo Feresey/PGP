@@ -1,6 +1,5 @@
 #include "solver.hpp"
-
-#define ROOT_RANK 0
+#include "helpers.hpp"
 
 Solver::Solver(std::istream& in)
 {
@@ -16,20 +15,18 @@ Solver::Solver(std::istream& in)
 
 void Solver::read_data(std::istream& in)
 {
-    in >> n_blocks;
-    in >> block_size;
-    in >> output_file_path;
-    in >> eps;
-    in >> l_size;
-    in >> u_down >> u_up >> u_left >> u_right >> u_front >> u_back;
-    in >> u_0;
+    in
+        >> grid
+        >> output_file_path
+        >> eps
+        >> l_size
+        >> u_down >> u_up >> u_left >> u_right >> u_front >> u_back
+        >> u_0;
 }
 
 void Solver::show_data(std::ostream& out)
 {
-    out << n_blocks.print("n_blocks")
-        << std::endl
-        << block_size.print("block_size")
+    out << grid
         << std::endl
         << "output_file_path: " << output_file_path
         << std::endl
@@ -47,28 +44,11 @@ void Solver::show_data(std::ostream& out)
         << std::endl;
 }
 
-inline void bcast_int(int* val)
-{
-    CSC(MPI_Bcast(val, 1, MPI_INT, ROOT_RANK, MPI_COMM_WORLD));
-}
-
-inline void bcast_double(double* val)
-{
-    CSC(MPI_Bcast(val, 1, MPI_DOUBLE, ROOT_RANK, MPI_COMM_WORLD));
-}
-
 void Solver::mpi_bcast()
 {
-    bcast_int(&n_blocks.x);
-    bcast_int(&n_blocks.y);
-    bcast_int(&n_blocks.z);
-    bcast_int(&block_size.x);
-    bcast_int(&block_size.y);
-    bcast_int(&block_size.z);
+    grid.mpi_bcast();
+    l_size.mpi_bcast();
     bcast_double(&eps);
-    bcast_double(&l_size.x);
-    bcast_double(&l_size.y);
-    bcast_double(&l_size.z);
     bcast_double(&u_down);
     bcast_double(&u_up);
     bcast_double(&u_left);
