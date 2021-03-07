@@ -1,0 +1,12 @@
+-include deps/dim3.cpp.mk
+-include deps/delme.cpp.mk
+-include deps/main.cpp.mk
+-include deps/solver__problem.cpp.mk
+-include deps/solver__common.cpp.mk
+-include deps/solver__solver.cpp.mk
+-include deps/grid.cpp.mk
+-include deps/helpers.hpp.mk
+-include deps/grid.hpp.mk
+-include deps/dim3.hpp.mk
+-include deps/solver__problem.hpp.mk
+-include deps/solver__solver.hpp.mk

@@ -9,7 +9,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "solver.hpp"
+#include "solver/solver.hpp"
 #include "helpers.hpp"
 
 int main(int argc, char** argv)

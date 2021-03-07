@@ -1,5 +1,7 @@
+#include <cfloat>
+
+#include "../helpers.hpp"
 #include "solver.hpp"
-#include "helpers.hpp"
 
 Solver::Solver(std::istream& in)
 {
@@ -11,6 +13,13 @@ Solver::Solver(std::istream& in)
     }
 
     this->mpi_bcast();
+
+    // да, так будет оверхед по памяти, но не нужно мучаться с границами.
+    const int max_dim = grid.max_size();
+    const int n_cells = grid.cells_per_block();
+
+    this->problem = Problem(n_cells, u_0, grid.bsize, grid.height(l_size));
+    this->send_buffer = std::vector<double>(max_dim * max_dim);
 }
 
 void Solver::read_data(std::istream& in)
@@ -24,7 +33,7 @@ void Solver::read_data(std::istream& in)
         >> u_0;
 }
 
-void Solver::show_data(std::ostream& out)
+void Solver::show_data(std::ostream& out) const
 {
     out << grid
         << std::endl

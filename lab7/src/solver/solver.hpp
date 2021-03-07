@@ -1,13 +1,13 @@
 #ifndef SOLVER_HPP
 #define SOLVER_HPP
 
-#include <mpi.h>
-
 #include <fstream>
 #include <string>
+#include <vector>
 
-#include "dim3.hpp"
-#include "grid.hpp"
+#include "../grid.hpp"
+
+#include "problem.hpp"
 
 class Solver {
     int rank;
@@ -15,19 +15,29 @@ class Solver {
 
     Grid grid;
 
-    double eps;
     dim3<double> l_size;
+    double eps;
     double u_down, u_up, u_left, u_right, u_front, u_back;
     double u_0;
 
     std::string output_file_path;
 
+    std::vector<double> send_buffer;
+
+    Problem problem;
+
     void read_data(std::istream& in);
-    void show_data(std::ostream& out);
+    void show_data(std::ostream& out) const;
     void mpi_bcast();
+
+    void boundary_layer_exchange();
+    double calc_error(double local_err) const;
+
+    void write_result();
 
 public:
     Solver(std::istream& in);
+    void solve();
 };
 
 #endif

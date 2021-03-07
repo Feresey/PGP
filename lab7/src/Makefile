@@ -1,10 +1,11 @@
-BUILDDIR ?= $(CURDIR)/build
-BINDIR   ?= $(CURDIR)/bin
+BUILDDIR := build
+BINDIR   ?= bin
+DEPS_DIR := deps
 
-TARGET_BIN ?= $(BINDIR)/$(TARGET)
+TARGET_BIN ?= $(BINDIR)/target
 
-CXX ?= g++
-CC  ?= gcc
+CXX   ?= g++
+MPICC ?= mpic++
 
 .PHONY: all clean
 
@@ -13,29 +14,50 @@ all: $(TARGET_BIN)
 clean:
 	rm $(TARGET_OBJECTS)
 
-CPP_SOURCES = main.cpp grid.cpp dim3.cpp solver.cpp
-HEADERS     = helpers.hpp dim3.hpp grid.hpp solver.hpp
+$(DEPS_DIR) $(BUILDDIR) $(BINDIR):
+	-mkdir -p "$@"
 
-grid.cpp solver.cpp dim3.cpp: helpers.hpp
 
-grid.hpp: dim3.hpp
-solver.hpp: dim3.hpp
+CPP_SOURCES = main.cpp grid.cpp dim3.cpp \
+			$(addprefix solver/,solver.cpp common.cpp problem.cpp)
+HEADERS     = $(shell find . -name '*.hpp')
 
-main.cpp: solver.hpp helpers.hpp
-dim3.cpp: dim3.hpp
-grid.cpp: grid.hpp
-solver.cpp: solver.hpp grid.hpp
+SOURCES = $(shell find . -name '*.cpp') $(HEADERS)
 
-CPP_OBJECTS = $(addprefix $(BUILDDIR)/,$(addsuffix .o,$(CPP_SOURCES)))
+DEPS_LIST = $(foreach dep,$(SOURCES),$(DEPS_DIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(dep))).mk)
+
+$(DEPS_LIST): $(DEPS_DIR)/%.mk: $(subst __,/,$@) | $(DEPS_DIR)
+	@echo $*
+	$(file > $@,$(patsubst %.cpp,$(BUILDDIR)/%.cpp.o,$*): $(shell $(CXX) -E $(subst __,/,$*) | \
+		grep -Eo '#\s[0-9]+\s".*$$' - | \
+		sed -re 's|#\s[0-9]+\s"(.*?)".*$$|\1|gi' | \
+		grep -v -e "^/usr" -e "^<" | \
+		sort -u | \
+		$(if $(patsubst %.hpp,,$*),,grep -v -e "$*" |) \
+		xargs -n1 realpath --relative-to $(CURDIR)))
+
+deps.mk: $(DEPS_LIST) | $(DEPS_DIR)
+	@echo $(DEPS_LIST) | xargs -n1 printf "-include %s\n" > $@
+
+-include deps.mk
+
+CPP_OBJECTS = $(foreach obj,$(CPP_SOURCES),$(BUILDDIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(obj))).o)
 
 TARGET_OBJECTS = $(CPP_OBJECTS)
 
+show:
+	@echo $(TARGET_OBJECTS)
+
 LDFLAGS = -lm -lmpi
 
-CFLAGS = -Wall -Wextra \
-		-Wno-sign-compare -Wno-long-long \
-		-Wconversion -Wsign-conversion \
-		-Wunreachable-code
+CFLAGS = -W -Wall -Wextra -Wpedantic \
+		-Wno-long-long \
+		-Wconversion -Wsign-conversion -Wno-sign-compare \
+		-Winit-self \
+		-Wctor-dtor-privacy -Wnon-virtual-dtor \
+		-Wold-style-cast \
+		-Wunreachable-code -fstack-protector \
+		--std=c++14
 
 ifeq ($(BENCH),on)
 CFLAGS = -O3
@@ -43,9 +65,10 @@ else
 CFLAGS += -g3
 endif
 
-$(TARGET_BIN): CXX=mpic++
 $(TARGET_BIN): $(TARGET_OBJECTS) | $(BINDIR)
-	$(CXX) $(CFLAGS) $(LDFLAGS) $^ -o $@
+	@echo $@
+	$(MPICC) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
-$(CPP_OBJECTS): $(BUILDDIR)/%.cpp.o: %.cpp | $(BUILDDIR)
-	$(CXX) $(CFLAGS) -c $^ -o $@
+$(CPP_OBJECTS): $(BUILDDIR)/%: $(patsubst %.cpp.o,%.cpp,$(subst __,/,$@)) | $(BUILDDIR)
+	@echo $@
+	$(CXX) $(CFLAGS) -c $(patsubst $(BUILDDIR)/%.cpp.o,%.cpp,$(subst __,/,$@)) -o $@
