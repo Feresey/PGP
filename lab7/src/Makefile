@@ -45,9 +45,6 @@ CPP_OBJECTS = $(foreach obj,$(CPP_SOURCES),$(BUILDDIR)/$(subst /,__,$(shell real
 
 TARGET_OBJECTS = $(CPP_OBJECTS)
 
-show:
-	@echo $(TARGET_OBJECTS)
-
 LDFLAGS = -lm -lmpi
 
 CFLAGS = -W -Wall -Wextra -Wpedantic \

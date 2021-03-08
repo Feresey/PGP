@@ -2,6 +2,16 @@
 
 #include "problem.hpp"
 
+Problem::Problem() { }
+
+Problem::Problem(size_t data_size, double init_value, const dim3<int> bsize, const dim3<double> height)
+    : height(height)
+    , bsize(bsize)
+    , data(data_size, init_value)
+    , data_next(data_size)
+{
+}
+
 double Problem::calc()
 {
     double max_error = 0.0;

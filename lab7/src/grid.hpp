@@ -16,19 +16,21 @@ struct Grid {
     friend std::ostream& operator<<(std::ostream& out, const Grid& data);
     friend std::istream& operator>>(std::istream& in, Grid& data);
 
-    int max_size() const;
+    uint max_size() const;
 
-    int block_index(int i, int j, int k) const;
-    int block_i(int n) const;
-    int block_j(int n) const;
-    int block_k(int n) const;
+    uint block_index(int i, int j, int k) const;
+    uint block_i(int n) const;
+    uint block_j(int n) const;
+    uint block_k(int n) const;
 
-    int cell_idx(int i, int j, int k) const;
-    int cell_i(int n) const;
-    int cell_j(int n) const;
-    int cell_k(int n) const;
+    uint cell_idx(int i, int j, int k) const;
+    uint cell_i(int n) const;
+    uint cell_j(int n) const;
+    uint cell_k(int n) const;
 
-    int cells_per_block() const;
+    uint cells_per_block() const;
+
+    // ну да, это скорее к Problem относится
     dim3<double> height(const dim3<double>& l_size) const;
 };
 

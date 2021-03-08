@@ -13,7 +13,8 @@ SEND_TARGET_DIR = $(SEND_DIR)/$(TARGET)
 .PHONY: all clean
 all: $(TARGET)
 clean:
-	-rm -rf $(BINDIR)/* $(BUILDDIR)/*
+	-rm -rf $(BINDIR)/*
+	$(MAKE) -C src clean
 
 $(BUILDDIR) $(BINDIR) $(SEND_DIR) $(SEND_TARGET_DIR):
 	mkdir -p $@

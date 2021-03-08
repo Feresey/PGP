@@ -15,11 +15,11 @@ Solver::Solver(std::istream& in)
     this->mpi_bcast();
 
     // да, так будет оверхед по памяти, но не нужно мучаться с границами.
-    const int max_dim = grid.max_size();
-    const int n_cells = grid.cells_per_block();
+    const uint max_dim = grid.max_size();
+    const uint n_cells = grid.cells_per_block();
 
     this->problem = Problem(n_cells, u_0, grid.bsize, grid.height(l_size));
-    this->send_buffer = std::vector<double>(max_dim * max_dim);
+    this->send_buffer = std::vector<double>(static_cast<size_t>(max_dim * max_dim));
 }
 
 void Solver::read_data(std::istream& in)

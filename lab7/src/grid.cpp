@@ -44,25 +44,40 @@ std::istream& operator>>(std::istream& in, Grid& data)
     return in;
 }
 
-int Grid::max_size() const { return std::max(bsize.x, std::max(bsize.y, bsize.z)); }
+uint Grid::max_size() const { return static_cast<uint>(std::max(bsize.x, std::max(bsize.y, bsize.z))); }
 
 // боже, какая жесть
 
-int Grid::block_index(int i, int j, int k) const { return k * (n_blocks.x * n_blocks.y) + j * n_blocks.x + i; }
-int Grid::block_i(int n) const { return (n % (n_blocks.x * n_blocks.y)) % n_blocks.x; }
-int Grid::block_j(int n) const { return (n % (n_blocks.x * n_blocks.y)) / n_blocks.x; }
-int Grid::block_k(int n) const { return n / (n_blocks.x * n_blocks.y); }
-
-int Grid::cell_idx(int i, int j, int k) const
+uint Grid::block_index(int i, int j, int k) const
 {
-    return (k + 1) * ((bsize.x + 2) * (bsize.y + 2))
-        + (j + 1) * (bsize.x + 2)
-        + (i + 1);
+    return static_cast<uint>(k * (n_blocks.x * n_blocks.y) + j * n_blocks.x + i);
 }
-int Grid::cell_i(int n) const { return (n % ((bsize.x + 2) * (bsize.y + 2))) % (bsize.x + 2) - 1; }
-int Grid::cell_j(int n) const { return (n % ((bsize.x + 2) * (bsize.y + 2))) / (bsize.x + 2) - 1; }
-int Grid::cell_k(int n) const { return (n / ((bsize.x + 2) * (bsize.y + 2))) - 1; }
+uint Grid::block_i(int n) const { return static_cast<uint>((n % (n_blocks.x * n_blocks.y)) % n_blocks.x); }
+uint Grid::block_j(int n) const { return static_cast<uint>((n % (n_blocks.x * n_blocks.y)) / n_blocks.x); }
+uint Grid::block_k(int n) const { return static_cast<uint>(n / (n_blocks.x * n_blocks.y)); }
 
-// TODO
-int Grid::cells_per_block() const { return -1; }
-dim3<double> Grid::height(const dim3<double>& l_size) const { return {}; }
+uint Grid::cell_idx(int i, int j, int k) const
+{
+    return static_cast<uint>((k + 1) * ((bsize.x + 2) * (bsize.y + 2))
+        + (j + 1) * (bsize.x + 2)
+        + (i + 1));
+}
+uint Grid::cell_i(int n) const { return static_cast<uint>((n % ((bsize.x + 2) * (bsize.y + 2))) % (bsize.x + 2) - 1); }
+uint Grid::cell_j(int n) const { return static_cast<uint>((n % ((bsize.x + 2) * (bsize.y + 2))) / (bsize.x + 2) - 1); }
+uint Grid::cell_k(int n) const { return static_cast<uint>((n / ((bsize.x + 2) * (bsize.y + 2))) - 1); }
+
+uint Grid::cells_per_block() const
+{
+    return static_cast<uint>((bsize.x + 2) * (bsize.y + 2) * (bsize.z + 2));
+}
+
+dim3<double> Grid::height(const dim3<double>& l_size) const
+{
+    dim3<double> res;
+
+    res.x = l_size.x / (n_blocks.x * bsize.x);
+    res.y = l_size.y / (n_blocks.y * bsize.y);
+    res.z = l_size.z / (n_blocks.z * bsize.z);
+
+    return res;
+}
