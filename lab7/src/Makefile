@@ -18,10 +18,10 @@ $(DEPS_DIR) $(BUILDDIR) $(BINDIR):
 	-mkdir -p "$@"
 
 
-CPP_SOURCES = main.cpp grid.cpp dim3.cpp \
-			$(addprefix solver/,solver.cpp common.cpp problem.cpp)
-HEADERS     = helpers.hpp grid.hpp dim3.hpp \
-			$(addprefix solver/,problem.hpp solver.hpp)
+CPP_SOURCES = main.cpp grid/grid.cpp dim3/dim3.cpp \
+			solver.cpp common.cpp problem.cpp exchange.cpp
+HEADERS     = helpers.hpp grid/grid.hpp dim3/dim3.hpp \
+			problem.hpp solver.hpp exchange.hpp
 
 SOURCES = $(CPP_SOURCES) $(HEADERS)
 
@@ -29,7 +29,7 @@ DEPS_LIST = $(foreach dep,$(SOURCES),$(DEPS_DIR)/$(subst /,__,$(shell realpath -
 
 $(DEPS_LIST): $(DEPS_DIR)/%.mk: $(subst __,/,$@) | $(DEPS_DIR)
 	@echo $*
-	$(file > $@,$(patsubst %.cpp,$(BUILDDIR)/%.cpp.o,$*): $(shell $(CXX) -E $(subst __,/,$*) | \
+	$(file > $@,$(patsubst %.cpp,$(BUILDDIR)/%.cpp.o,$*): $(shell $(CXX) -I. -E $(subst __,/,$*) | \
 		grep -Eo '#\s[0-9]+\s".*$$' - | \
 		sed -re 's|#\s[0-9]+\s"(.*?)".*$$|\1|gi' | \
 		grep -v -e "^/usr" -e "^<" | \
@@ -46,7 +46,12 @@ CPP_OBJECTS = $(foreach obj,$(CPP_SOURCES),$(BUILDDIR)/$(subst /,__,$(shell real
 
 TARGET_OBJECTS = $(CPP_OBJECTS)
 
+show:
+	@echo $(TARGET_OBJECTS)
+
 LDFLAGS = -lm -lmpi
+
+IFLAGS = -I.
 
 CFLAGS = -W -Wall -Wextra -Wpedantic \
 		-Wno-long-long \
@@ -65,8 +70,8 @@ endif
 
 $(TARGET_BIN): $(TARGET_OBJECTS) | $(BINDIR)
 	@echo $@
-	$(MPICC) $(CFLAGS) $(LDFLAGS) $^ -o $@
+	$(MPICC) $(CFLAGS) $(IFLAGS) $(LDFLAGS) $^ -o $@
 
 $(CPP_OBJECTS): $(BUILDDIR)/%: $(patsubst %.cpp.o,%.cpp,$(subst __,/,$@)) | $(BUILDDIR)
 	@echo $@
-	$(CXX) $(CFLAGS) -c $(patsubst $(BUILDDIR)/%.cpp.o,%.cpp,$(subst __,/,$@)) -o $@
+	$(CXX) $(CFLAGS) $(IFLAGS) -c $(patsubst $(BUILDDIR)/%.cpp.o,%.cpp,$(subst __,/,$@)) -o $@

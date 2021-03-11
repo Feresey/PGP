@@ -2,13 +2,12 @@
 
 #include "problem.hpp"
 
-Problem::Problem() { }
-
-Problem::Problem(size_t data_size, double init_value, const dim3<int> bsize, const dim3<double> height)
-    : height(height)
-    , bsize(bsize)
-    , data(data_size, init_value)
-    , data_next(data_size)
+Problem::Problem(const Task& task, const Grid& grid)
+    : grid(grid)
+    , task(task)
+    , height(grid.height(task.l_size))
+    , data_next(grid.cells_per_block())
+    , data(grid.cells_per_block(), task.u_0)
 {
 }
 
