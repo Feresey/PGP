@@ -35,6 +35,12 @@ class Solver {
 
     void write_result();
 
+    void exchange2D(
+        const uint block_idx, const uint block_size,
+        const uint a_size, const uint b_size,
+        const double lower_init, const double upper_init,
+        const int recvtag_lower, const int recvtag_upper);
+
 public:
     Solver(std::istream& in);
     void solve();

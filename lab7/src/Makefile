@@ -37,7 +37,7 @@ $(DEPS_LIST): $(DEPS_DIR)/%.mk: $(subst __,/,$@) | $(DEPS_DIR)
 		xargs -n1 realpath --relative-to $(CURDIR)))
 
 deps.mk: $(DEPS_LIST) | $(DEPS_DIR)
-	@echo $(DEPS_LIST) | xargs -n1 printf "-include %s\n" > $@
+	@echo $(sort $(DEPS_LIST)) | xargs -n1 printf "-include %s\n" > $@
 
 -include deps.mk
 

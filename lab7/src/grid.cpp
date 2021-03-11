@@ -48,7 +48,7 @@ uint Grid::max_size() const { return static_cast<uint>(std::max(bsize.x, std::ma
 
 // боже, какая жесть
 
-uint Grid::block_index(int i, int j, int k) const
+uint Grid::block_idx(int i, int j, int k) const
 {
     return static_cast<uint>(k * (n_blocks.x * n_blocks.y) + j * n_blocks.x + i);
 }

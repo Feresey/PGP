@@ -18,7 +18,7 @@ struct Grid {
 
     uint max_size() const;
 
-    uint block_index(int i, int j, int k) const;
+    uint block_idx(int i, int j, int k) const;
     uint block_i(int n) const;
     uint block_j(int n) const;
     uint block_k(int n) const;
