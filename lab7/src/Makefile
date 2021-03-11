@@ -1,6 +1,6 @@
 BUILDDIR := build
 BINDIR   ?= bin
-DEPS_DIR := deps
+DEPS_DIR := $(BUILDDIR)/deps
 
 TARGET_BIN ?= $(BINDIR)/target
 
@@ -20,9 +20,10 @@ $(DEPS_DIR) $(BUILDDIR) $(BINDIR):
 
 CPP_SOURCES = main.cpp grid.cpp dim3.cpp \
 			$(addprefix solver/,solver.cpp common.cpp problem.cpp)
-HEADERS     = $(shell find . -name '*.hpp')
+HEADERS     = helpers.hpp grid.hpp dim3.hpp \
+			$(addprefix solver/,problem.hpp solver.hpp)
 
-SOURCES = $(shell find . -name '*.cpp') $(HEADERS)
+SOURCES = $(CPP_SOURCES) $(HEADERS)
 
 DEPS_LIST = $(foreach dep,$(SOURCES),$(DEPS_DIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(dep))).mk)
 
@@ -37,7 +38,7 @@ $(DEPS_LIST): $(DEPS_DIR)/%.mk: $(subst __,/,$@) | $(DEPS_DIR)
 		xargs -n1 realpath --relative-to $(CURDIR)))
 
 deps.mk: $(DEPS_LIST) | $(DEPS_DIR)
-	@echo $(sort $(DEPS_LIST)) | xargs -n1 printf "-include %s\n" > $@
+	@cat $(sort $(DEPS_LIST)) > $@
 
 -include deps.mk
 
