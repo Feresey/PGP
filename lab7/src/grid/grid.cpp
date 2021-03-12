@@ -16,6 +16,9 @@ void Grid::mpi_bcast()
 std::ostream& operator<<(std::ostream& out, const Grid& data)
 {
     out
+        << "rank: " << data.process_rank
+        << " n_processes: " << data.n_processes
+        << std::endl
         << data.bsize.print("block_size")
         << std::endl
         << data.n_blocks.print("n_blocks");
@@ -36,18 +39,14 @@ int Grid::block_idx(int i, int j, int k) const
 {
     return k * (n_blocks.x * n_blocks.y) + j * n_blocks.x + i;
 }
-int Grid::block_i() const
-{
-    return (process_rank % (n_blocks.x * n_blocks.y)) % n_blocks.x;
-}
 
-int Grid::block_j() const
+dim3<int> Grid::block_dim() const
 {
-    return (process_rank % (n_blocks.x * n_blocks.y)) / n_blocks.x;
-}
-int Grid::block_k() const
-{
-    return process_rank / (n_blocks.x * n_blocks.y);
+    return {
+        (process_rank % (n_blocks.x * n_blocks.y)) % n_blocks.x,
+        (process_rank % (n_blocks.x * n_blocks.y)) / n_blocks.x,
+        (process_rank / (n_blocks.x * n_blocks.y))
+    };
 }
 
 size_t Grid::cell_idx(int i, int j, int k) const

@@ -19,6 +19,7 @@ int main(int argc, char** argv)
     int rank, n_processes;
     CSC(MPI_Comm_rank(MPI_COMM_WORLD, &rank));
     CSC(MPI_Comm_size(MPI_COMM_WORLD, &n_processes));
+    CSC(MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN));
 
     Grid grid(rank, n_processes);
     Task task;
@@ -28,12 +29,13 @@ int main(int argc, char** argv)
         >> output_file_path
         >> task;
 
-
     grid.mpi_bcast();
     task.mpi_bcast();
 
     Problem problem(task, grid);
     Solver solver(grid, task);
+
+    std::cout << solver << std::endl;
 
     solver.solve(problem);
 

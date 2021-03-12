@@ -17,15 +17,15 @@ std::istream& operator>>(std::istream& in, Task& task)
 
 std::ostream& operator<<(std::ostream& out, const Task& task)
 {
-    out << "eps: " << task.eps
+    out << "eps:\t" << task.eps
         << std::endl
         << task.l_size.print("l_size") << std::endl
         << "u_bottom: " << task.u_bottom
-        << "u_top: " << task.u_top
-        << "u_left: " << task.u_left
-        << "u_right: " << task.u_right
-        << "u_front: " << task.u_front
-        << "u_back: " << task.u_back
+        << " u_top: " << task.u_top
+        << " u_left: " << task.u_left
+        << " u_right: " << task.u_right
+        << " u_front: " << task.u_front
+        << " u_back: " << task.u_back
         << std::endl
         << "u_0: " << task.u_0;
     return out;

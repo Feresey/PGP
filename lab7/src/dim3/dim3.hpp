@@ -55,10 +55,9 @@ public:
     friend std::ostream& operator<<(std::ostream& out, const dim3_print<T>& data)
     {
         out
-            << data.prefix + "_x: " << data.data.x
-            << data.prefix + "_y: " << data.data.y
-            << data.prefix + "_z: " << data.data.z
-            << std::endl;
+            << data.prefix + "_x:\t" << data.data.x << "\t"
+            << data.prefix + "_y:\t" << data.data.y << "\t"
+            << data.prefix + "_z:\t" << data.data.z;
         return out;
     }
 };

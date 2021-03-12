@@ -19,9 +19,7 @@ struct Grid {
     int max_size() const;
 
     int block_idx(int i, int j, int k) const;
-    int block_i() const;
-    int block_j() const;
-    int block_k() const;
+    dim3<int> block_dim() const;
 
     size_t cell_idx(int i, int j, int k) const;
     // int cell_i(int n) const;

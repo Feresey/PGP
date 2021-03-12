@@ -45,9 +45,11 @@ void Exchange::exchange2D(
 
         int exchange_process_rank = get_block_idx(block_idx - 1);
 
-        MPI_Sendrecv(send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, recvtag_lower,
+        std::cout << "process_rank:" << exchange_process_rank << std::endl;
+
+        CSC(MPI_Sendrecv(send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, recvtag_lower,
             receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, recvtag_upper,
-            MPI_COMM_WORLD, &status);
+            MPI_COMM_WORLD, &status));
 
         for (int a = 0; a < a_size; ++a)
             for (int b = 0; b < grid.bsize.z; ++b)
@@ -65,10 +67,11 @@ void Exchange::exchange2D(
                 send_buffer[size_t(a * grid.bsize.z + b)] = problem.data[get_cell_idx(block_idx - 1, a, b)];
 
         int exchange_process_rank = get_block_idx(block_idx + 1);
+        std::cout << "process_rank:" << exchange_process_rank << std::endl;
 
-        MPI_Sendrecv(send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, recvtag_upper,
+        CSC(MPI_Sendrecv(send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, recvtag_upper,
             receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, recvtag_lower,
-            MPI_COMM_WORLD, &status);
+            MPI_COMM_WORLD, &status));
 
         for (int a = 0; a < a_size; ++a)
             for (int b = 0; b < b_size; ++b)
@@ -78,37 +81,36 @@ void Exchange::exchange2D(
 
 void Exchange::boundary_layer_exchange()
 {
-    const int block_i = grid.block_i(),
-              block_j = grid.block_j(),
-              block_k = grid.block_k();
+    const dim3<int> block_dim = grid.block_dim();
+    std::cout << block_dim.print("block_dim") << std::endl;
 
     exchange2D(
-        block_i, grid.n_blocks.x,
+        block_dim.x, grid.n_blocks.x,
         grid.bsize.y, grid.bsize.z,
         task.u_left, task.u_right,
         LEFT, RIGHT,
         [this](int my, int a, int b) { return grid.cell_idx(my, a, b); },
-        [this, block_j, block_k](int block_idx) {
-            return grid.block_idx(block_idx, block_j, block_k);
+        [this, block_dim](int block_idx) {
+            return grid.block_idx(block_idx, block_dim.y, block_dim.z);
         });
 
     exchange2D(
-        block_j, grid.n_blocks.y,
+        block_dim.y, grid.n_blocks.y,
         grid.bsize.x, grid.bsize.z,
         task.u_front, task.u_back,
         FRONT, BACK,
         [this](int my, int a, int b) { return grid.cell_idx(a, my, b); },
-        [this, block_i, block_k](int block_idx) {
-            return grid.block_idx(block_i, block_idx, block_k);
+        [this, block_dim](int block_idx) {
+            return grid.block_idx(block_dim.x, block_idx, block_dim.z);
         });
 
     exchange2D(
-        block_k, grid.n_blocks.z,
+        block_dim.z, grid.n_blocks.z,
         grid.bsize.x, grid.bsize.y,
         task.u_bottom, task.u_top,
         FRONT, BACK,
         [this](int my, int a, int b) { return grid.cell_idx(a, b, my); },
-        [this, block_i, block_j](int block_idx) {
-            return grid.block_idx(block_i, block_j, block_idx);
+        [this, block_dim](int block_idx) {
+            return grid.block_idx(block_dim.x, block_dim.y, block_idx);
         });
 }
