@@ -22,17 +22,15 @@ void Solver::solve(Problem& problem, const std::string& output)
         MPI_Barrier(MPI_COMM_WORLD);
 
         double local_error = problem.calc();
-        exchange.write_result(std::cerr);
+        // exchange.write_result(std::cerr);
         error = this->calc_error(local_error);
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
     if (grid.process_rank == ROOT_RANK) {
-        std::cout << "receive" << std::endl;
         std::fstream out(output, out.trunc | out.out);
         exchange.write_result(out);
-    }else {
-        std::cout << "send" << std::endl;
+    } else {
         exchange.send_result();
     }
 }

@@ -38,8 +38,6 @@ void Exchange::exchange2D(
     if (block_idx == 0) {
         for (int a = 0; a < a_size; ++a) {
             for (int b = 0; b < b_size; ++b) {
-                auto cell = grid.cell_idx(get_cell_idx(-1, a, b));
-                std::cerr << cell.print("idx") << "=" << lower_init << std::endl;
                 problem.data[get_cell_idx(-1, a, b)] = lower_init;
             }
         }
@@ -68,8 +66,6 @@ void Exchange::exchange2D(
     if (block_idx == n_blocks - 1) {
         for (int a = 0; a < a_size; ++a) {
             for (int b = 0; b < b_size; ++b) {
-                auto cell = grid.cell_idx(get_cell_idx(cell_size, a, b));
-                std::cerr << dim3<int>(cell_size, a, b).print("fuck") << ":" << cell.print("idx") << "=" << lower_init << std::endl;
                 problem.data[get_cell_idx(cell_size, a, b)] = upper_init;
             }
         }
@@ -77,7 +73,7 @@ void Exchange::exchange2D(
         // отсылка и прием верхнего граничного условия
         for (int a = 0; a < a_size; ++a) {
             for (int b = 0; b < b_size; ++b) {
-                send_buffer[size_t(a * b_size + b)] = problem.data[get_cell_idx(block_idx - 1, a, b)];
+                send_buffer[size_t(a * b_size + b)] = problem.data[get_cell_idx(cell_size - 1, a, b)];
             }
         }
 
@@ -94,15 +90,11 @@ void Exchange::exchange2D(
             }
         }
     }
-
-    std::cerr << "once" << std::endl;
-    problem.show(std::cerr);
 }
 
 void Exchange::boundary_layer_exchange()
 {
     const dim3<int> block_idx = grid.block_idx();
-    std::cerr << block_idx.print("block_idx") << std::endl;
 
     exchange2D(
         block_idx.x, grid.n_blocks.x, grid.bsize.x,

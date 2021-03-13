@@ -7,9 +7,9 @@
 #include "problem.hpp"
 
 class Exchange {
-    Grid grid;
-    Task task;
-    Problem problem;
+    const Grid& grid;
+    const Task& task;
+    Problem& problem;
 
     std::vector<double> send_buffer;
     std::vector<double> receive_buffer;
