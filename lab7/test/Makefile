@@ -16,8 +16,6 @@ HEX_RESULT = $(addsuffix .hex,$(RESULT))
 BINARY_INPUT  = $(addsuffix .bin,$(INPUT))
 BINARY_RESULT = $(addsuffix .bin,$(RESULT))
 
-HEXS   = $(HEX_INPUT) $(HEX_RESULT)
-
 .PHONY: all clean
 
 all: $(DIFFS)

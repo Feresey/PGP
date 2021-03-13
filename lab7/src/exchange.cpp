@@ -146,6 +146,8 @@ void Exchange::write_layer(int j, int k, int block_idx, std::ostream& out)
         }
         out << receive_buffer[size_t(i)];
     }
+
+    out << std::endl;
 }
 
 void Exchange::write_result(std::ostream& out)
