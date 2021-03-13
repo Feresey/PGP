@@ -30,6 +30,8 @@ public:
     double calc();
 
     Problem(const Task& task, const Grid& grid);
+
+    void show(std::ostream& out) const;
 };
 
 #endif

@@ -25,21 +25,20 @@ std::ostream& operator<<(std::ostream& out, const Grid& data)
         << "rank: " << data.process_rank
         << " n_processes: " << data.n_processes
         << std::endl
-        << data.bsize.print("block_size")
+        << data.n_blocks.print("n_blocks")
         << std::endl
-        << data.n_blocks.print("n_blocks");
+        << data.bsize.print("block_size");
     return out;
 }
 
-
 int Grid::max_size() const { return std::max(bsize.x, std::max(bsize.y, bsize.z)); }
 
-int Grid::block_idx(int i, int j, int k) const
+int Grid::block_absolute_id(int i, int j, int k) const
 {
     return k * (n_blocks.x * n_blocks.y) + j * n_blocks.x + i;
 }
 
-dim3<int> Grid::block_dim() const
+dim3<int> Grid::block_idx() const
 {
     return {
         (process_rank % (n_blocks.x * n_blocks.y)) % n_blocks.x,
@@ -48,11 +47,19 @@ dim3<int> Grid::block_dim() const
     };
 }
 
-size_t Grid::cell_idx(int i, int j, int k) const
+size_t Grid::cell_absolute_id(int i, int j, int k) const
 {
-    return static_cast<size_t>((k + 1) * ((bsize.x + 2) * (bsize.y + 2))
-        + (j + 1) * (bsize.x + 2)
-        + (i + 1));
+    return static_cast<size_t>(
+        (((k) + 1) * ((bsize.x + 2) * (bsize.y + 2)) + ((j) + 1) * (bsize.x + 2) + ((i) + 1)));
+}
+
+dim3<int> Grid::cell_idx(int n) const
+{
+    return {
+        (n % ((bsize.x + 2) * (bsize.y + 2))) % (bsize.x + 2) - 1,
+        (n % ((bsize.x + 2) * (bsize.y + 2))) / (bsize.x + 2) - 1,
+        (n / ((bsize.x + 2) * (bsize.y + 2))) - 1
+    };
 }
 
 size_t Grid::cells_per_block() const
@@ -64,9 +71,9 @@ dim3<double> Grid::height(const dim3<double>& l_size) const
 {
     dim3<double> res;
 
-    res.x = l_size.x / (n_blocks.x * bsize.x);
-    res.y = l_size.y / (n_blocks.y * bsize.y);
-    res.z = l_size.z / (n_blocks.z * bsize.z);
+    res.x = l_size.x / double(n_blocks.x * bsize.x);
+    res.y = l_size.y / double(n_blocks.y * bsize.y);
+    res.z = l_size.z / double(n_blocks.z * bsize.z);
 
     return res;
 }

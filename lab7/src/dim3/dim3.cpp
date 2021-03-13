@@ -1,6 +1,6 @@
 #include "dim3.hpp"
 
-template<>
+template <>
 MPI_Datatype dim3<int>::mpi_type() { return MPI_INT; }
-template<>
+template <>
 MPI_Datatype dim3<double>::mpi_type() { return MPI_DOUBLE; }

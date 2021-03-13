@@ -15,7 +15,7 @@ class Exchange {
     std::vector<double> receive_buffer;
 
     void exchange2D(
-        const int block_idx, const int block_size,
+        const int block_idx, const int n_blocks, const int cell_size,
         const int a_size, const int b_size,
         const double lower_init, const double upper_init,
         const int recvtag_lower, const int recvtag_upper,
@@ -29,6 +29,7 @@ public:
     void boundary_layer_exchange();
 
     void write_result(std::ostream& out);
+    void send_result();
 };
 
 #endif

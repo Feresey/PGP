@@ -18,9 +18,13 @@ struct Grid {
 
     int max_size() const;
 
-    int block_idx(int i, int j, int k) const;
-    dim3<int> block_dim() const;
-    size_t cell_idx(int i, int j, int k) const;
+    int block_absolute_id(int i, int j, int k) const;
+    dim3<int> block_idx() const;
+
+    size_t cell_absolute_id(int i, int j, int k) const;
+
+    dim3<int> cell_idx(int n) const;
+
     size_t cells_per_block() const;
 
     // ну да, это скорее к Problem относится

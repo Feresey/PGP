@@ -17,6 +17,7 @@ class dim3_print;
 template <class T>
 class dim3 {
     MPI_Datatype mpi_type();
+
 public:
     T x, y, z;
 
@@ -55,9 +56,12 @@ public:
     friend std::ostream& operator<<(std::ostream& out, const dim3_print<T>& data)
     {
         out
-            << data.prefix + "_x:\t" << data.data.x << "\t"
-            << data.prefix + "_y:\t" << data.data.y << "\t"
-            << data.prefix + "_z:\t" << data.data.z;
+            << data.prefix
+            << ": ("
+            << data.data.x << ","
+            << data.data.y << ","
+            << data.data.z
+            << ")";
         return out;
     }
 };

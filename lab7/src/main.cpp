@@ -29,6 +29,18 @@ int main(int argc, char** argv)
         >> output
         >> task;
 
+    if (rank == ROOT_RANK) {
+        if (grid.n_blocks.x * grid.n_blocks.y * grid.n_blocks.z != n_processes) {
+            std::cerr
+                << "incorrect block dimensions. actual " << grid.n_blocks.print("dim")
+                << ", but got n_processes: " << n_processes
+                << std::endl;
+            CSC(MPI_Abort(MPI_COMM_WORLD, MPI_ERR_DIMS));
+        }
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
     grid.mpi_bcast();
     task.mpi_bcast();
 
@@ -36,6 +48,8 @@ int main(int argc, char** argv)
     Solver solver(grid, task);
 
     std::cout << solver << std::endl;
+
+    std::cout.flush();
 
     solver.solve(problem, output);
 

@@ -37,6 +37,7 @@ $(DEPS_LIST): $(DEPS_DIR)/%.mk: | $(DEPS_DIR)
 		$(if $(patsubst %.hpp,,$*),,grep -v -e "$*" |) \
 		xargs -n1 realpath --relative-to $(CURDIR)))
 
+.PHONY: deps.mk
 deps.mk: $(DEPS_LIST) | $(DEPS_DIR)
 	@cat $(sort $(DEPS_LIST)) > $@
 
