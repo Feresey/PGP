@@ -4,8 +4,8 @@ DEPS_DIR := $(BUILDDIR)/deps
 
 TARGET_BIN ?= $(BINDIR)/target
 
-CXX   ?= g++
-MPICC ?= mpic++
+CXX    ?= g++
+MPICXX ?= mpic++
 
 .PHONY: all clean
 
@@ -24,6 +24,21 @@ HEADERS     = helpers.hpp grid/grid.hpp dim3/dim3.hpp \
 			problem.hpp solver.hpp exchange.hpp
 
 SOURCES = $(CPP_SOURCES)
+
+COPY_TARGETS = $(addprefix COPY_,$(CPP_SOURCES) $(HEADERS))
+
+.PHONY: $(COPY_TARGETS)
+$(COPY_TARGETS): COPY_%:
+	mkdir -p $(DESTDIR)/$(dir $*)
+	cp $* $(DESTDIR)/$(dir $*)
+
+define stupidmake
+all:
+	$(MPICXX) $(IFLAGS) $(LDFLAGS) $(CPP_SOURCES) -o $(TARGET)
+endef
+
+copy: $(COPY_TARGETS)
+	$(file > $(DESTDIR)/Makefile,$(stupidmake))
 
 DEPS_LIST = $(foreach dep,$(SOURCES),$(DEPS_DIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(dep))).mk)
 
@@ -71,7 +86,7 @@ endif
 
 $(TARGET_BIN): $(TARGET_OBJECTS) | $(BINDIR)
 	@echo $@
-	$(MPICC) $(CFLAGS) $(IFLAGS) $(LDFLAGS) $^ -o $@
+	$(MPICXX) $(CFLAGS) $(IFLAGS) $(LDFLAGS) $^ -o $@
 
 $(CPP_OBJECTS): $(BUILDDIR)/%: | $(BUILDDIR)
 	@echo $@

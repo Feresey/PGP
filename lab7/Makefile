@@ -25,8 +25,8 @@ test: $(TARGET_BIN) | $(CONVERT_TOOL)
 
 .PHONY: send
 send: | $(SEND_DIR) $(SEND_TARGET_DIR)
-	cp $(addprefix $(SRCDIR)/,$(C_SOURCES) $(CU_SOURCES) $(HEADERS)) $(SEND_DIR)/$(TARGET)
-	cp $(SEND_DIR)/Makefile $(SEND_TARGET_DIR)
+	mkdir -p $(SEND_TARGET_DIR)
+	$(MAKE) -C $(SRCDIR) copy DESTDIR=$(SEND_TARGET_DIR) TARGET=lab7
 	cd $(SEND_DIR) && tar cvf $(TARGET).tar $(TARGET)
 	gpg -r 703FD5D038947C5B57CCE5A64DF7496E16FD3CBC -ab $(SEND_DIR)/$(TARGET).tar
 
