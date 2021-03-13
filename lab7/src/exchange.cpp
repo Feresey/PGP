@@ -1,4 +1,5 @@
 #include "exchange.hpp"
+#include "helpers.hpp"
 
 Exchange::Exchange(const Grid& grid, const Task& task, Problem& problem)
     : grid(grid)
@@ -33,6 +34,8 @@ void Exchange::exchange2D(
 
     int count = a_size * b_size;
 
+    std::cout << "block_idx: " << block_idx << std::endl;
+
     if (block_idx == 0) {
         for (int a = 0; a < a_size; ++a)
             for (int b = 0; b < grid.bsize.z; ++b)
@@ -56,6 +59,7 @@ void Exchange::exchange2D(
                 problem.data[get_cell_idx(-1, a, b)] = receive_buffer[size_t(a * b_size + b)];
     }
 
+    std::cout << "block_size_top: " << block_size - 1 << std::endl;
     if (block_idx == block_size - 1) {
         for (int a = 0; a < a_size; ++a)
             for (int b = 0; b < b_size; ++b)
@@ -113,4 +117,44 @@ void Exchange::boundary_layer_exchange()
         [this, block_dim](int block_idx) {
             return grid.block_idx(block_dim.x, block_dim.y, block_idx);
         });
+}
+
+void Exchange::write_layer(int j, int k, int block_idx, std::ostream& out)
+{
+    MPI_Status status;
+
+    if (block_idx == 0) {
+        for (int i = 0; i < grid.bsize.x; ++i) {
+            receive_buffer[size_t(i)] = problem.data[grid.cell_idx(i, j, k)];
+        }
+    } else {
+        CSC(MPI_Recv(receive_buffer.data(), grid.bsize.x, MPI_DOUBLE, block_idx, k * grid.bsize.z + j, MPI_COMM_WORLD, &status));
+    }
+
+    for (int i = 0; i < grid.bsize.x; ++i) {
+        if (i != 0) {
+            out << " ";
+        }
+        out << receive_buffer[size_t(i)];
+    }
+}
+
+void Exchange::write_result(std::ostream& out)
+{
+    out << std::scientific;
+
+    for (int bk = 0; bk < grid.n_blocks.z; ++bk) {
+        for (int k = 0; k < grid.bsize.z; ++k) {
+            for (int bj = 0; bj < grid.n_blocks.y; ++bj) {
+                for (int j = 0; j < grid.bsize.y; ++j) {
+                    for (int bi = 0; bi < grid.n_blocks.x; ++bi) {
+                        int block_idx = grid.block_idx(bi, bj, bk);
+                        this->write_layer(j, k, block_idx, out);
+                    }
+                    out << std::endl;
+                }
+            }
+            out << std::endl;
+        }
+    }
 }

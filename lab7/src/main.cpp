@@ -23,10 +23,10 @@ int main(int argc, char** argv)
 
     Grid grid(rank, n_processes);
     Task task;
-    std::string output_file_path;
+    std::string output;
     std::cin
         >> grid
-        >> output_file_path
+        >> output
         >> task;
 
     grid.mpi_bcast();
@@ -37,8 +37,7 @@ int main(int argc, char** argv)
 
     std::cout << solver << std::endl;
 
-    solver.solve(problem);
+    solver.solve(problem, output);
 
-    // Solver s(rank, n_processes, std::cin);
     CSC(MPI_Finalize());
 }

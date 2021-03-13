@@ -20,12 +20,7 @@ struct Grid {
 
     int block_idx(int i, int j, int k) const;
     dim3<int> block_dim() const;
-
     size_t cell_idx(int i, int j, int k) const;
-    // int cell_i(int n) const;
-    // int cell_j(int n) const;
-    // int cell_k(int n) const;
-
     size_t cells_per_block() const;
 
     // ну да, это скорее к Problem относится

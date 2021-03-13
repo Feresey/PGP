@@ -28,8 +28,9 @@ double Problem::calc()
                 double temp = num / denum;
                 double error = std::abs(data[grid.cell_idx(i, j, k)] - temp);
 
-                if (error > max_error)
+                if (error > max_error) {
                     max_error = error;
+                }
 
                 data_next[grid.cell_idx(i, j, k)] = temp;
             }
@@ -37,3 +38,4 @@ double Problem::calc()
     std::swap(data, data_next);
     return max_error;
 }
+

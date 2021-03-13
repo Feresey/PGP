@@ -20,11 +20,9 @@ class Solver {
     void boundary_layer_exchange();
     double calc_error(double local_err) const;
 
-    void write_result();
-
 public:
     Solver(const Grid& grid, const Task& task);
-    void solve(Problem& problem);
+    void solve(Problem& problem, const std::string& output);
 };
 
 #endif

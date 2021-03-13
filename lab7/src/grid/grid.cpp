@@ -13,6 +13,12 @@ void Grid::mpi_bcast()
     n_blocks.mpi_bcast();
 }
 
+std::istream& operator>>(std::istream& in, Grid& grid)
+{
+    in >> grid.n_blocks >> grid.bsize;
+    return in;
+}
+
 std::ostream& operator<<(std::ostream& out, const Grid& data)
 {
     out
@@ -25,15 +31,8 @@ std::ostream& operator<<(std::ostream& out, const Grid& data)
     return out;
 }
 
-std::istream& operator>>(std::istream& in, Grid& grid)
-{
-    in >> grid.bsize >> grid.n_blocks;
-    return in;
-}
 
 int Grid::max_size() const { return std::max(bsize.x, std::max(bsize.y, bsize.z)); }
-
-// боже, какая жесть
 
 int Grid::block_idx(int i, int j, int k) const
 {
@@ -55,9 +54,6 @@ size_t Grid::cell_idx(int i, int j, int k) const
         + (j + 1) * (bsize.x + 2)
         + (i + 1));
 }
-// int Grid::cell_i(int n) const { return (n % ((bsize.x + 2) * (bsize.y + 2))) % (bsize.x + 2) - 1; }
-// int Grid::cell_j(int n) const { return (n % ((bsize.x + 2) * (bsize.y + 2))) / (bsize.x + 2) - 1; }
-// int Grid::cell_k(int n) const { return (n / ((bsize.x + 2) * (bsize.y + 2))) - 1; }
 
 size_t Grid::cells_per_block() const
 {

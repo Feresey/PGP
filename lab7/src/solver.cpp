@@ -11,7 +11,7 @@ Solver::Solver(const Grid& grid, const Task& task)
 {
 }
 
-void Solver::solve(Problem& problem)
+void Solver::solve(Problem& problem, const std::string& output)
 {
     Exchange exchange(grid, task, problem);
 
@@ -26,11 +26,8 @@ void Solver::solve(Problem& problem)
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    this->write_result();
-}
-
-void Solver::write_result()
-{
+    std::fstream out(output, out.trunc | out.out);
+    exchange.write_result(out);
 }
 
 double Solver::calc_error(double local_error) const
