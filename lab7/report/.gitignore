@@ -1,0 +1,7 @@
+*
+!*.tex
+!*.txt
+!*.png
+!*.jpg
+!.gitignore
+!*.nvprof

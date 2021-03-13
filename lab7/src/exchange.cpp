@@ -6,7 +6,7 @@ Exchange::Exchange(const Grid& grid, const Task& task, Problem& problem)
     , task(task)
     , problem(problem)
 {
-    // да, так будет оверхед по памяти, но не нужно мучиться с границами.
+    //@ да, так будет оверхед по памяти, но не нужно мучиться с границами.@
     const int max_dim = grid.max_size();
 
     this->send_buffer = std::vector<double>(static_cast<size_t>(max_dim * max_dim + 2));
@@ -42,7 +42,7 @@ void Exchange::exchange2D(
             }
         }
     } else {
-        // отсылка и прием нижнего граничного условия
+        //@ отсылка и прием нижнего граничного условия@
         for (int a = 0; a < a_size; ++a) {
             for (int b = 0; b < b_size; ++b) {
                 send_buffer[size_t(a * b_size + b)] = problem.data[get_cell_idx(0, a, b)];
@@ -70,7 +70,7 @@ void Exchange::exchange2D(
             }
         }
     } else {
-        // отсылка и прием верхнего граничного условия
+        //@ отсылка и прием верхнего граничного условия@
         for (int a = 0; a < a_size; ++a) {
             for (int b = 0; b < b_size; ++b) {
                 send_buffer[size_t(a * b_size + b)] = problem.data[get_cell_idx(cell_size - 1, a, b)];

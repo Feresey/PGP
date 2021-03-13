@@ -27,7 +27,7 @@ struct Grid {
 
     size_t cells_per_block() const;
 
-    // ну да, это скорее к Problem относится
+    //@ ну да, это скорее к Problem относится@
     dim3<double> height(const dim3<double>& l_size) const;
 };
 
