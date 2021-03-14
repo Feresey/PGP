@@ -65,7 +65,7 @@ void Exchange::exchange2D(
             CSC(MPI_Irecv(receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag2, MPI_COMM_WORLD, &req2));
 
             CSC(MPI_Wait(&req1, MPI_STATUS_IGNORE));
-            CSC(MPI_Wait(&req1, MPI_STATUS_IGNORE));
+            CSC(MPI_Wait(&req2, MPI_STATUS_IGNORE));
         }
 
         for (int a = 0; a < a_size; ++a) {
