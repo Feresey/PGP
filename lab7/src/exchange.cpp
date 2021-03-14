@@ -30,63 +30,47 @@ void Exchange::exchange2D(
     std::function<size_t(int my, int a, int b)> get_cell_idx,
     std::function<int(int)> get_block_idx)
 {
+    const int count = a_size * b_size;
 
-    MPI_Status status;
+    MPI_Request req1, req2;
 
-    int count = a_size * b_size;
+    for (int each = 0; each <= 1; ++each) {
+        const int copy_cell = (each == 0) ? 0 : (cell_size - 1);
+        const int bound_cell = (each == 0) ? -1 : cell_size;
+        const double init_val = (each == 0) ? lower_init : upper_init;
 
-    if (block_idx == 0) {
-        for (int a = 0; a < a_size; ++a) {
-            for (int b = 0; b < b_size; ++b) {
-                problem.data[get_cell_idx(-1, a, b)] = lower_init;
+        //@ Является ли текущий блок граничным@
+        const bool is_boundary = block_idx == ((each == 0) ? 0 : (n_blocks - 1));
+
+        if (!is_boundary) {
+            const int tag1 = (each == 0) ? recvtag_lower : recvtag_upper;
+            const int tag2 = (each == 0) ? recvtag_upper : recvtag_lower;
+            const int exchange_process_rank = get_block_idx(block_idx + ((each == 0) ? -1 : 1));
+
+            //@ отсылка и прием нижнего граничного условия@
+            for (int a = 0; a < a_size; ++a) {
+                for (int b = 0; b < b_size; ++b) {
+                    send_buffer[size_t(a * b_size + b)] = problem.data[get_cell_idx(copy_cell, a, b)];
+                }
             }
-        }
-    } else {
-        //@ отсылка и прием нижнего граничного условия@
-        for (int a = 0; a < a_size; ++a) {
-            for (int b = 0; b < b_size; ++b) {
-                send_buffer[size_t(a * b_size + b)] = problem.data[get_cell_idx(0, a, b)];
-            }
-        }
 
-        int exchange_process_rank = get_block_idx(block_idx - 1);
+            // CSC(MPI_Sendrecv(
+            //     send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag1,
+            //     receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag2,
+            //     MPI_COMM_WORLD, MPI_STATUS_IGNORE));
 
-        CSC(MPI_Sendrecv(
-            send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, recvtag_lower,
-            receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, recvtag_upper,
-            MPI_COMM_WORLD, &status));
+            // std::cerr << "I am " << grid.process_rank << ". send " << tag1 << std::endl;
+            CSC(MPI_Isend(send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag1, MPI_COMM_WORLD, &req1));
+            // std::cerr << "I am " << grid.process_rank << ". receive " << tag2 << std::endl;
+            CSC(MPI_Irecv(receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag2, MPI_COMM_WORLD, &req2));
 
-        for (int a = 0; a < a_size; ++a) {
-            for (int b = 0; b < b_size; ++b) {
-                problem.data[get_cell_idx(-1, a, b)] = receive_buffer[size_t(a * b_size + b)];
-            }
-        }
-    }
-
-    if (block_idx == n_blocks - 1) {
-        for (int a = 0; a < a_size; ++a) {
-            for (int b = 0; b < b_size; ++b) {
-                problem.data[get_cell_idx(cell_size, a, b)] = upper_init;
-            }
-        }
-    } else {
-        //@ отсылка и прием верхнего граничного условия@
-        for (int a = 0; a < a_size; ++a) {
-            for (int b = 0; b < b_size; ++b) {
-                send_buffer[size_t(a * b_size + b)] = problem.data[get_cell_idx(cell_size - 1, a, b)];
-            }
+            CSC(MPI_Wait(&req1, MPI_STATUS_IGNORE));
+            CSC(MPI_Wait(&req1, MPI_STATUS_IGNORE));
         }
 
-        int exchange_process_rank = get_block_idx(block_idx + 1);
-
-        CSC(MPI_Sendrecv(
-            send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, recvtag_upper,
-            receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, recvtag_lower,
-            MPI_COMM_WORLD, &status));
-
         for (int a = 0; a < a_size; ++a) {
             for (int b = 0; b < b_size; ++b) {
-                problem.data[get_cell_idx(cell_size, a, b)] = receive_buffer[size_t(a * b_size + b)];
+                problem.data[get_cell_idx(bound_cell, a, b)] = (is_boundary) ? init_val : receive_buffer[size_t(a * b_size + b)];
             }
         }
     }
@@ -129,15 +113,13 @@ void Exchange::boundary_layer_exchange()
 
 void Exchange::write_layer(int j, int k, int block_idx, std::ostream& out)
 {
-    MPI_Status status;
-
     if (block_idx == 0) {
         for (int i = 0; i < grid.bsize.x; ++i) {
             receive_buffer[size_t(i)] = problem.data[grid.cell_absolute_id(i, j, k)];
         }
     } else {
         int tag = k * grid.bsize.z + j;
-        CSC(MPI_Recv(receive_buffer.data(), grid.bsize.x, MPI_DOUBLE, block_idx, tag, MPI_COMM_WORLD, &status));
+        CSC(MPI_Recv(receive_buffer.data(), grid.bsize.x, MPI_DOUBLE, block_idx, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
     }
 
     for (int i = 0; i < grid.bsize.x; ++i) {
@@ -146,8 +128,6 @@ void Exchange::write_layer(int j, int k, int block_idx, std::ostream& out)
         }
         out << receive_buffer[size_t(i)];
     }
-
-    out << std::endl;
 }
 
 void Exchange::write_result(std::ostream& out)
@@ -160,6 +140,9 @@ void Exchange::write_result(std::ostream& out)
                 for (int j = 0; j < grid.bsize.y; ++j) {
                     for (int bi = 0; bi < grid.n_blocks.x; ++bi) {
                         int block_idx = grid.block_absolute_id(bi, bj, bk);
+                        if (bi != 0) {
+                            out << " ";
+                        }
                         this->write_layer(j, k, block_idx, out);
                     }
                     out << std::endl;
