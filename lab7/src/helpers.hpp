@@ -1,13 +1,9 @@
 #ifndef HELPERS_HPP
 #define HELPERS_HPP
 
-#define bcast(val, type) CSC(MPI_Bcast(val, 1, type, ROOT_RANK, MPI_COMM_WORLD))
-#define bcast_int(val) bcast(val, MPI_INT)
-#define bcast_double(val) bcast(val, MPI_DOUBLE)
-
 #define ROOT_RANK 0
 
-#define CSC(call)                                            \
+#define MPI_ERR(call)                                            \
     do {                                                     \
         int err = (call);                                    \
         if (err != MPI_SUCCESS) {                            \
@@ -20,5 +16,9 @@
             exit(0);                                         \
         }                                                    \
     } while (false)
+
+#define bcast(val, type) MPI_ERR(MPI_Bcast(val, 1, type, ROOT_RANK, MPI_COMM_WORLD))
+#define bcast_int(val) bcast(val, MPI_INT)
+#define bcast_double(val) bcast(val, MPI_DOUBLE)
 
 #endif

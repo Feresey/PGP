@@ -38,7 +38,7 @@ void Solver::solve(Problem& problem, const std::string& output)
 double Solver::calc_error(double local_error) const
 {
     double all_error = DBL_MAX;
-    CSC(MPI_Allreduce(&local_error, &all_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD));
+    MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD));
 
     return all_error;
 }

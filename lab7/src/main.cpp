@@ -15,11 +15,11 @@
 
 int main(int argc, char** argv)
 {
-    CSC(MPI_Init(&argc, &argv));
+    MPI_ERR(MPI_Init(&argc, &argv));
     int rank, n_processes;
-    CSC(MPI_Comm_rank(MPI_COMM_WORLD, &rank));
-    CSC(MPI_Comm_size(MPI_COMM_WORLD, &n_processes));
-    CSC(MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN));
+    MPI_ERR(MPI_Comm_rank(MPI_COMM_WORLD, &rank));
+    MPI_ERR(MPI_Comm_size(MPI_COMM_WORLD, &n_processes));
+    MPI_ERR(MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN));
 
     Grid grid(rank, n_processes);
     Task task;
@@ -35,7 +35,7 @@ int main(int argc, char** argv)
                 << "incorrect block dimensions. actual " << grid.n_blocks.print("dim")
                 << ", but got n_processes: " << n_processes
                 << std::endl;
-            CSC(MPI_Abort(MPI_COMM_WORLD, MPI_ERR_DIMS));
+            MPI_ERR(MPI_Abort(MPI_COMM_WORLD, MPI_ERR_DIMS));
         }
     }
 
@@ -53,5 +53,5 @@ int main(int argc, char** argv)
 
     solver.solve(problem, output);
 
-    CSC(MPI_Finalize());
+    MPI_ERR(MPI_Finalize());
 }

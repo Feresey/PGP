@@ -60,12 +60,12 @@ void Exchange::exchange2D(
             //     MPI_COMM_WORLD, MPI_STATUS_IGNORE));
 
             // std::cerr << "I am " << grid.process_rank << ". send " << tag1 << std::endl;
-            CSC(MPI_Isend(send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag1, MPI_COMM_WORLD, &req1));
+            MPI_ERR(MPI_Isend(send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag1, MPI_COMM_WORLD, &req1));
             // std::cerr << "I am " << grid.process_rank << ". receive " << tag2 << std::endl;
-            CSC(MPI_Irecv(receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag2, MPI_COMM_WORLD, &req2));
+            MPI_ERR(MPI_Irecv(receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag2, MPI_COMM_WORLD, &req2));
 
-            CSC(MPI_Wait(&req1, MPI_STATUS_IGNORE));
-            CSC(MPI_Wait(&req2, MPI_STATUS_IGNORE));
+            MPI_ERR(MPI_Wait(&req1, MPI_STATUS_IGNORE));
+            MPI_ERR(MPI_Wait(&req2, MPI_STATUS_IGNORE));
         }
 
         for (int a = 0; a < a_size; ++a) {
@@ -119,7 +119,7 @@ void Exchange::write_layer(int j, int k, int block_idx, std::ostream& out)
         }
     } else {
         int tag = k * grid.bsize.z + j;
-        CSC(MPI_Recv(receive_buffer.data(), grid.bsize.x, MPI_DOUBLE, block_idx, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
+        MPI_ERR(MPI_Recv(receive_buffer.data(), grid.bsize.x, MPI_DOUBLE, block_idx, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
     }
 
     for (int i = 0; i < grid.bsize.x; ++i) {
