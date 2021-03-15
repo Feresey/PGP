@@ -5,6 +5,7 @@ DEPS_DIR := $(BUILDDIR)/deps
 TARGET_BIN ?= $(BINDIR)/target
 
 CXX    ?= g++
+NVCC   ?= nvcc
 MPICXX ?= mpic++
 
 .PHONY: all clean
@@ -17,13 +18,20 @@ clean:
 $(DEPS_DIR) $(BUILDDIR) $(BINDIR):
 	-mkdir -p "$@"
 
+HEADERS     = helpers.hpp grid/grid.hpp dim3/dim3.hpp \
+			problem.hpp solver.hpp exchange.hpp kernels.hpp helpers.cuh
 
+ifeq ($(CUDA),off)
 CPP_SOURCES = main.cpp grid/grid.cpp dim3/dim3.cpp \
 			solver.cpp common.cpp problem.cpp exchange.cpp
-HEADERS     = helpers.hpp grid/grid.hpp dim3/dim3.hpp \
-			problem.hpp solver.hpp exchange.hpp
 
 SOURCES = $(CPP_SOURCES)
+
+else
+CU_SOURCES  = kernels.cu grid/grid.cu
+CPP_SOURCES = main.cpp dim3/dim3.cpp \
+			solver.cpp common.cpp problem.cpp exchange.cpp
+endif
 
 COPY_TARGETS = $(addprefix COPY_,$(CPP_SOURCES) $(HEADERS))
 

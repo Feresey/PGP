@@ -25,7 +25,7 @@ struct Grid {
 
     __host__ __device__ size_t cell_absolute_id(int i, int j, int k) const;
 
-    __host__ __device__ mydim3<int> cell_idx(int n) const;
+    mydim3<int> cell_idx(int n) const;
 
     size_t cells_per_block() const;
 

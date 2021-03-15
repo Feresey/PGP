@@ -53,7 +53,7 @@ __host__ __device__ size_t Grid::cell_absolute_id(int i, int j, int k) const
         (((k) + 1) * ((bsize.x + 2) * (bsize.y + 2)) + ((j) + 1) * (bsize.x + 2) + ((i) + 1)));
 }
 
-__host__ __device__ mydim3<int> Grid::cell_idx(int n) const
+mydim3<int> Grid::cell_idx(int n) const
 {
     return {
         (n % ((bsize.x + 2) * (bsize.y + 2))) % (bsize.x + 2) - 1,

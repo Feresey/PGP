@@ -42,4 +42,4 @@ cudaError_t cudaSetDevice(int);
 cudaError_t cudaMemcpy(void*, void*, int, int);
 #endif
 
-#endif
+#endif // HELPERS_CUH
