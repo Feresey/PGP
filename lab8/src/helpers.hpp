@@ -21,11 +21,4 @@
 #define bcast_int(val) bcast(val, MPI_INT)
 #define bcast_double(val) bcast(val, MPI_DOUBLE)
 
-#ifndef __NVCC__
-#define __host__
-#define __device__
-#define __global__
-#define __shared__
-#endif
-
 #endif

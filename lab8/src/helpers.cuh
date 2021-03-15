@@ -1,11 +1,6 @@
 #ifndef HELPERS_CUH
 #define HELPERS_CUH
 
-#include <cstddef>
-#include <cstdint>
-#include <cstdio>
-#include <cstdlib>
-
 #define CUDA_ERR(k)                                               \
     do {                                                          \
         cudaError_t call = (k);                                   \
@@ -16,6 +11,35 @@
         }                                                         \
     } while (false)
 
-#define KERNEL_ERR() CUDA_ERR(cudaGetLastError())
+#define START_KERNEL(KERNEL) KERNEL; CUDA_ERR(cudaGetLastError())
+
+#ifndef __NVCC__
+#include "dim3/dim3.hpp"
+
+#undef START_KERNEL
+#define START_KERNEL(KERNEL)
+
+#define __host__
+#define __device__
+#define __global__
+#define __shared__
+
+typedef int cudaError_t;
+
+#define cudaSuccess 0
+
+typedef mydim3<int> dim3;
+
+static const dim3 threadIdx, threadDim, blockIdx, blockDim, gridIdx, gridDim;
+
+cudaError_t cudaGetLastError();
+char* cudaGetErrorString(cudaError_t);
+cudaError_t cudaSetDevice(int);
+
+#define cudaMemcpyDeviceToHost 0
+#define cudaMemcpyHostToDevice 1
+
+cudaError_t cudaMemcpy(void*, void*, int, int);
+#endif
 
 #endif

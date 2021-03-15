@@ -3,7 +3,7 @@
 
 #include "dim3/dim3.hpp"
 
-#include "helpers.hpp"
+#include "helpers.cuh"
 
 struct Grid {
     const int process_rank;

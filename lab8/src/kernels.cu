@@ -1,19 +1,26 @@
-#include "dim3/dim3.hpp"
-#include "helpers.cuh"
+#include <cmath>
 
-#define LEFT 0
-#define RIGHT 1
-#define BACK 2
-#define FRONT 3
-#define DOWN 4
-#define UP 5
+#include "dim3/dim3.hpp"
+#include "grid/grid.hpp"
+#include "helpers.cuh"
 
 #define BORDER_OPERATIONS_GRID_DIM 32
 #define BORDER_OPERATIONS_BLOCK_DIM 32
 
-#define GRID_DIM 8
+enum side_tag {
+    LEFT,
+    RIGHT,
+    FRONT,
+    BACK,
+    TOP,
+    BOTTOM
+};
 
-#define MULTIPLE_GPU_CRITERIA 100000
+enum border_tag {
+    UP_DOWN,
+    LEFT_RIGHT,
+    FRONT_BACK
+};
 
 __global__ void get_border(double* out, double* buf, Grid grid, int a_size, int b_size, int border_idx, border_tag tag)
 {
@@ -28,17 +35,17 @@ __global__ void get_border(double* out, double* buf, Grid grid, int a_size, int 
         for (int a = id_a; a < a_size; a += offset_a) {
             switch (tag) {
             case LEFT_RIGHT:
-                temp = buf[grid.cell_idx(border_idx, a ,b);
+                temp = buf[grid.cell_absolute_id(border_idx, a, b)];
                 break;
             case FRONT_BACK:
-                temp = buf[grid.cell_idx(a, border_idx, b);
+                temp = buf[grid.cell_absolute_id(a, border_idx, b)];
                 break;
             case UP_DOWN:
-                temp = buf[grid.cell_idx(a, b, border_idx);
+                temp = buf[grid.cell_absolute_id(a, b, border_idx)];
                 break;
             }
 
-            out[j * block_size_x + i] = temp;
+            out[b * a_size + a] = temp;
         }
     }
 }
@@ -56,13 +63,13 @@ __global__ void set_border(double* out, double* buf, Grid grid, int a_size, int 
         for (int a = id_a; a < a_size; a += offset_a) {
             switch (tag) {
             case LEFT_RIGHT:
-                dest_idx = grid.cell_idx(border_idx, a, b);
+                dest_idx = grid.cell_absolute_id(border_idx, a, b);
                 break;
             case FRONT_BACK:
-                dest_idx = grid.cell_idx(a, border_idx, , b);
+                dest_idx = grid.cell_absolute_id(a, border_idx, b);
                 break;
             case UP_DOWN:
-                dest_idx = grid.cell_idx(a, b, border_idx);
+                dest_idx = grid.cell_absolute_id(a, b, border_idx);
                 break;
             }
 
@@ -133,86 +140,86 @@ void get_border_multigpu(double* dst, double* dev_dst, double** src, double** bu
     dim3 kernel_launch_grid = dim3(BORDER_OPERATIONS_GRID_DIM, BORDER_OPERATIONS_GRID_DIM);
     dim3 kernel_launch_block = dim3(BORDER_OPERATIONS_BLOCK_DIM, BORDER_OPERATIONS_BLOCK_DIM);
 
-    if (split_type == UPDOWN) {
-        if (border == UP || border == DOWN) {
-            int src_index = border == DOWN ? 0 : device_count - 1;
-            int border_index = border == DOWN ? 0 : block_sizes_z[device_count - 1] - 1;
-            CHECK_CUDA_CALL_ERROR(cudaSetDevice(src_index));
-            get_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_dst, src[src_index],
-                block_sizes_x[src_index], block_sizes_y[src_index], block_sizes_z[src_index], border_index);
-            CHECK_CUDA_CALL_ERROR(cudaMemcpy(dst, dev_dst, sizeof(double) * block_sizes_x[0] * block_sizes_y[0], cudaMemcpyDeviceToHost));
+    if (split_type == UP_DOWN) {
+        if (border == TOP || border == BOTTOM) {
+            int src_index = border == BOTTOM ? 0 : device_count - 1;
+            int border_index = border == BOTTOM ? 0 : block_sizes_z[device_count - 1] - 1;
+            CUDA_ERR(cudaSetDevice(src_index));
+            START_KERNEL((get_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_dst, src[src_index],
+                block_sizes_x[src_index], block_sizes_y[src_index], block_sizes_z[src_index], border_index)));
+            CUDA_ERR(cudaMemcpy(dst, dev_dst, sizeof(double) * block_sizes_x[0] * block_sizes_y[0], cudaMemcpyDeviceToHost));
         } else if (border == LEFT || border == RIGHT) {
             int border_index = border == LEFT ? 0 : block_sizes_x[device_count - 1] - 1;
             for (int d = 0; d < device_count; ++d) {
-                CHECK_CUDA_CALL_ERROR(cudaSetDevice(d));
-                get_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffers[d], src[d],
-                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index);
-                CHECK_CUDA_CALL_ERROR(cudaMemcpy(buffers[d], dev_buffers[d], sizeof(double) * block_sizes_y[d] * block_sizes_z[d], cudaMemcpyDeviceToHost));
+                CUDA_ERR(cudaSetDevice(d));
+                START_KERNEL((get_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffers[d], src[d],
+                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index)));
+                CUDA_ERR(cudaMemcpy(buffers[d], dev_buffers[d], sizeof(double) * block_sizes_y[d] * block_sizes_z[d], cudaMemcpyDeviceToHost));
             }
             vertical_stack(dst, buffers, block_sizes_y[0], block_sizes_z, device_count);
         } else if (border == FRONT || border == BACK) {
             int border_index = border == FRONT ? 0 : block_sizes_y[device_count - 1] - 1;
             for (int d = 0; d < device_count; ++d) {
-                CHECK_CUDA_CALL_ERROR(cudaSetDevice(d));
-                get_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffers[d], src[d],
-                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index);
-                CHECK_CUDA_CALL_ERROR(cudaMemcpy(buffers[d], dev_buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_z[d], cudaMemcpyDeviceToHost));
+                CUDA_ERR(cudaSetDevice(d));
+                START_KERNEL((get_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffers[d], src[d],
+                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index)));
+                CUDA_ERR(cudaMemcpy(buffers[d], dev_buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_z[d], cudaMemcpyDeviceToHost));
             }
             vertical_stack(dst, buffers, block_sizes_x[0], block_sizes_z, device_count);
         }
-    } else if (split_type == LEFTRIGHT) {
-        if (border == UP || border == DOWN) {
-            int border_index = border == DOWN ? 0 : block_sizes_z[device_count - 1] - 1;
+    } else if (split_type == LEFT_RIGHT) {
+        if (border == TOP || border == BOTTOM) {
+            int border_index = border == BOTTOM ? 0 : block_sizes_z[device_count - 1] - 1;
             for (int d = 0; d < device_count; ++d) {
-                CHECK_CUDA_CALL_ERROR(cudaSetDevice(d));
-                get_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffers[d], src[d],
-                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index);
-                CHECK_CUDA_CALL_ERROR(cudaMemcpy(buffers[d], dev_buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_y[d], cudaMemcpyDeviceToHost));
+                CUDA_ERR(cudaSetDevice(d));
+                START_KERNEL((get_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffers[d], src[d],
+                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index)));
+                CUDA_ERR(cudaMemcpy(buffers[d], dev_buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_y[d], cudaMemcpyDeviceToHost));
             }
             horizontal_stack(dst, buffers, block_sizes_x, block_sizes_y[0], device_count);
         } else if (border == LEFT || border == RIGHT) {
             int src_index = border == LEFT ? 0 : device_count - 1;
             int border_index = border == LEFT ? 0 : block_sizes_x[device_count - 1] - 1;
-            CHECK_CUDA_CALL_ERROR(cudaSetDevice(src_index));
-            get_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_dst, src[src_index],
-                block_sizes_x[src_index], block_sizes_y[src_index], block_sizes_z[src_index], border_index);
-            CHECK_CUDA_CALL_ERROR(cudaMemcpy(dst, dev_dst, sizeof(double) * block_sizes_y[0] * block_sizes_z[0], cudaMemcpyDeviceToHost));
+            CUDA_ERR(cudaSetDevice(src_index));
+            START_KERNEL((get_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_dst, src[src_index],
+                block_sizes_x[src_index], block_sizes_y[src_index], block_sizes_z[src_index], border_index)));
+            CUDA_ERR(cudaMemcpy(dst, dev_dst, sizeof(double) * block_sizes_y[0] * block_sizes_z[0], cudaMemcpyDeviceToHost));
         } else if (border == FRONT || border == BACK) {
             int border_index = border == FRONT ? 0 : block_sizes_y[device_count - 1] - 1;
             for (int d = 0; d < device_count; ++d) {
-                CHECK_CUDA_CALL_ERROR(cudaSetDevice(d));
-                get_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffers[d], src[d],
-                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index);
-                CHECK_CUDA_CALL_ERROR(cudaMemcpy(buffers[d], dev_buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_z[d], cudaMemcpyDeviceToHost));
+                CUDA_ERR(cudaSetDevice(d));
+                START_KERNEL((get_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffers[d], src[d],
+                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index)));
+                CUDA_ERR(cudaMemcpy(buffers[d], dev_buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_z[d], cudaMemcpyDeviceToHost));
             }
             horizontal_stack(dst, buffers, block_sizes_x, block_sizes_z[0], device_count);
         }
-    } else if (split_type == FRONTBACK) {
-        if (border == UP || border == DOWN) {
-            int border_index = border == DOWN ? 0 : block_sizes_z[device_count - 1] - 1;
+    } else if (split_type == FRONT_BACK) {
+        if (border == TOP || border == BOTTOM) {
+            int border_index = border == BOTTOM ? 0 : block_sizes_z[device_count - 1] - 1;
             for (int d = 0; d < device_count; ++d) {
-                CHECK_CUDA_CALL_ERROR(cudaSetDevice(d));
-                get_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffers[d], src[d],
-                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index);
-                CHECK_CUDA_CALL_ERROR(cudaMemcpy(buffers[d], dev_buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_y[d], cudaMemcpyDeviceToHost));
+                CUDA_ERR(cudaSetDevice(d));
+                START_KERNEL((get_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffers[d], src[d],
+                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index)));
+                CUDA_ERR(cudaMemcpy(buffers[d], dev_buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_y[d], cudaMemcpyDeviceToHost));
             }
             vertical_stack(dst, buffers, block_sizes_x[0], block_sizes_y, device_count);
         } else if (border == LEFT || border == RIGHT) {
             int border_index = border == LEFT ? 0 : block_sizes_x[device_count - 1] - 1;
             for (int d = 0; d < device_count; ++d) {
-                CHECK_CUDA_CALL_ERROR(cudaSetDevice(d));
-                get_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffers[d], src[d],
-                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index);
-                CHECK_CUDA_CALL_ERROR(cudaMemcpy(buffers[d], dev_buffers[d], sizeof(double) * block_sizes_y[d] * block_sizes_z[d], cudaMemcpyDeviceToHost));
+                CUDA_ERR(cudaSetDevice(d));
+                START_KERNEL((get_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffers[d], src[d],
+                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index)));
+                CUDA_ERR(cudaMemcpy(buffers[d], dev_buffers[d], sizeof(double) * block_sizes_y[d] * block_sizes_z[d], cudaMemcpyDeviceToHost));
             }
             horizontal_stack(dst, buffers, block_sizes_y, block_sizes_z[0], device_count);
         } else if (border == FRONT || border == BACK) {
             int src_index = border == FRONT ? 0 : device_count - 1;
             int border_index = border == FRONT ? 0 : block_sizes_y[device_count - 1] - 1;
-            CHECK_CUDA_CALL_ERROR(cudaSetDevice(src_index));
-            get_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_dst, src[src_index],
-                block_sizes_x[src_index], block_sizes_y[src_index], block_sizes_z[src_index], border_index);
-            CHECK_CUDA_CALL_ERROR(cudaMemcpy(dst, dev_dst, sizeof(double) * block_sizes_x[0] * block_sizes_z[0], cudaMemcpyDeviceToHost));
+            CUDA_ERR(cudaSetDevice(src_index));
+            START_KERNEL((get_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_dst, src[src_index],
+                block_sizes_x[src_index], block_sizes_y[src_index], block_sizes_z[src_index], border_index)));
+            CUDA_ERR(cudaMemcpy(dst, dev_dst, sizeof(double) * block_sizes_x[0] * block_sizes_z[0], cudaMemcpyDeviceToHost));
         }
     } else {
         printf("ERROR OCCURED\n");
@@ -226,86 +233,86 @@ void set_border_multigpu(double** dst, double* src, double* dev_src, double** bu
     dim3 kernel_launch_grid = dim3(BORDER_OPERATIONS_GRID_DIM, BORDER_OPERATIONS_GRID_DIM);
     dim3 kernel_launch_block = dim3(BORDER_OPERATIONS_BLOCK_DIM, BORDER_OPERATIONS_BLOCK_DIM);
 
-    if (split_type == UPDOWN) {
-        if (border == UP || border == DOWN) {
-            int src_index = border == DOWN ? 0 : device_count - 1;
-            int border_index = border == DOWN ? -1 : block_sizes_z[device_count - 1];
-            CHECK_CUDA_CALL_ERROR(cudaSetDevice(src_index));
-            CHECK_CUDA_CALL_ERROR(cudaMemcpy(dev_src, src, sizeof(double) * block_sizes_x[0] * block_sizes_y[0], cudaMemcpyHostToDevice));
-            set_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[src_index], dev_src,
-                block_sizes_x[src_index], block_sizes_y[src_index], block_sizes_z[src_index], border_index);
+    if (split_type == UP_DOWN) {
+        if (border == TOP || border == BOTTOM) {
+            int src_index = border == BOTTOM ? 0 : device_count - 1;
+            int border_index = border == BOTTOM ? -1 : block_sizes_z[device_count - 1];
+            CUDA_ERR(cudaSetDevice(src_index));
+            CUDA_ERR(cudaMemcpy(dev_src, src, sizeof(double) * block_sizes_x[0] * block_sizes_y[0], cudaMemcpyHostToDevice));
+            START_KERNEL((set_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[src_index], dev_src,
+                block_sizes_x[src_index], block_sizes_y[src_index], block_sizes_z[src_index], border_index)));
         } else if (border == LEFT || border == RIGHT) {
             int border_index = border == LEFT ? -1 : block_sizes_x[device_count - 1];
             vertical_unstack(src, buffers, block_sizes_y[0], block_sizes_z, device_count);
             for (int d = 0; d < device_count; ++d) {
-                CHECK_CUDA_CALL_ERROR(cudaSetDevice(d));
-                CHECK_CUDA_CALL_ERROR(cudaMemcpy(dev_buffers[d], buffers[d], sizeof(double) * block_sizes_y[d] * block_sizes_z[d], cudaMemcpyHostToDevice));
-                set_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[d], dev_buffers[d],
-                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index);
+                CUDA_ERR(cudaSetDevice(d));
+                CUDA_ERR(cudaMemcpy(dev_buffers[d], buffers[d], sizeof(double) * block_sizes_y[d] * block_sizes_z[d], cudaMemcpyHostToDevice));
+                START_KERNEL((set_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[d], dev_buffers[d],
+                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index)));
             }
         } else if (border == FRONT || border == BACK) {
             int border_index = border == FRONT ? -1 : block_sizes_y[device_count - 1];
             vertical_unstack(src, buffers, block_sizes_x[0], block_sizes_z, device_count);
             for (int d = 0; d < device_count; ++d) {
-                CHECK_CUDA_CALL_ERROR(cudaSetDevice(d));
-                CHECK_CUDA_CALL_ERROR(cudaMemcpy(dev_buffers[d], buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_z[d], cudaMemcpyHostToDevice));
-                set_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[d], dev_buffers[d],
-                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index);
+                CUDA_ERR(cudaSetDevice(d));
+                CUDA_ERR(cudaMemcpy(dev_buffers[d], buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_z[d], cudaMemcpyHostToDevice));
+                START_KERNEL((set_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[d], dev_buffers[d],
+                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index)));
             }
         }
-    } else if (split_type == LEFTRIGHT) {
-        if (border == UP || border == DOWN) {
-            int border_index = border == DOWN ? -1 : block_sizes_z[device_count - 1];
+    } else if (split_type == LEFT_RIGHT) {
+        if (border == TOP || border == BOTTOM) {
+            int border_index = border == BOTTOM ? -1 : block_sizes_z[device_count - 1];
             horizontal_unstack(src, buffers, block_sizes_x, block_sizes_y[0], device_count);
             for (int d = 0; d < device_count; ++d) {
-                CHECK_CUDA_CALL_ERROR(cudaSetDevice(d));
-                CHECK_CUDA_CALL_ERROR(cudaMemcpy(dev_buffers[d], buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_y[d], cudaMemcpyHostToDevice));
-                set_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[d], dev_buffers[d],
-                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index);
+                CUDA_ERR(cudaSetDevice(d));
+                CUDA_ERR(cudaMemcpy(dev_buffers[d], buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_y[d], cudaMemcpyHostToDevice));
+                START_KERNEL((set_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[d], dev_buffers[d],
+                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index)));
             }
         } else if (border == LEFT || border == RIGHT) {
             int src_index = border == LEFT ? 0 : device_count - 1;
             int border_index = border == LEFT ? -1 : block_sizes_x[device_count - 1];
-            CHECK_CUDA_CALL_ERROR(cudaSetDevice(src_index));
-            CHECK_CUDA_CALL_ERROR(cudaMemcpy(dev_src, src, sizeof(double) * block_sizes_y[0] * block_sizes_z[0], cudaMemcpyHostToDevice));
-            set_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[src_index], dev_src,
-                block_sizes_x[src_index], block_sizes_y[src_index], block_sizes_z[src_index], border_index);
+            CUDA_ERR(cudaSetDevice(src_index));
+            CUDA_ERR(cudaMemcpy(dev_src, src, sizeof(double) * block_sizes_y[0] * block_sizes_z[0], cudaMemcpyHostToDevice));
+            START_KERNEL((set_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[src_index], dev_src,
+                block_sizes_x[src_index], block_sizes_y[src_index], block_sizes_z[src_index], border_index)));
         } else if (border == FRONT || border == BACK) {
             int border_index = border == FRONT ? -1 : block_sizes_y[device_count - 1];
             horizontal_unstack(src, buffers, block_sizes_x, block_sizes_z[0], device_count);
             for (int d = 0; d < device_count; ++d) {
-                CHECK_CUDA_CALL_ERROR(cudaSetDevice(d));
-                CHECK_CUDA_CALL_ERROR(cudaMemcpy(dev_buffers[d], buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_z[d], cudaMemcpyHostToDevice));
-                set_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[d], dev_buffers[d],
-                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index);
+                CUDA_ERR(cudaSetDevice(d));
+                CUDA_ERR(cudaMemcpy(dev_buffers[d], buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_z[d], cudaMemcpyHostToDevice));
+                START_KERNEL((set_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[d], dev_buffers[d],
+                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index)));
             }
         }
-    } else if (split_type == FRONTBACK) {
-        if (border == UP || border == DOWN) {
-            int border_index = border == DOWN ? -1 : block_sizes_z[device_count - 1];
+    } else if (split_type == FRONT_BACK) {
+        if (border == TOP || border == BOTTOM) {
+            int border_index = border == BOTTOM ? -1 : block_sizes_z[device_count - 1];
             vertical_unstack(src, buffers, block_sizes_x[0], block_sizes_y, device_count);
             for (int d = 0; d < device_count; ++d) {
-                CHECK_CUDA_CALL_ERROR(cudaSetDevice(d));
-                CHECK_CUDA_CALL_ERROR(cudaMemcpy(dev_buffers[d], buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_y[d], cudaMemcpyHostToDevice));
-                set_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[d], dev_buffers[d],
-                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index);
+                CUDA_ERR(cudaSetDevice(d));
+                CUDA_ERR(cudaMemcpy(dev_buffers[d], buffers[d], sizeof(double) * block_sizes_x[d] * block_sizes_y[d], cudaMemcpyHostToDevice));
+                START_KERNEL((set_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[d], dev_buffers[d],
+                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index)));
             }
         } else if (border == LEFT || border == RIGHT) {
             int border_index = border == LEFT ? -1 : block_sizes_x[device_count - 1];
             horizontal_unstack(src, buffers, block_sizes_y, block_sizes_z[0], device_count);
             for (int d = 0; d < device_count; ++d) {
-                CHECK_CUDA_CALL_ERROR(cudaSetDevice(d));
-                CHECK_CUDA_CALL_ERROR(cudaMemcpy(dev_buffers[d], buffers[d], sizeof(double) * block_sizes_y[d] * block_sizes_z[d], cudaMemcpyHostToDevice));
-                set_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[d], dev_buffers[d],
-                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index);
+                CUDA_ERR(cudaSetDevice(d));
+                CUDA_ERR(cudaMemcpy(dev_buffers[d], buffers[d], sizeof(double) * block_sizes_y[d] * block_sizes_z[d], cudaMemcpyHostToDevice));
+                START_KERNEL((set_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[d], dev_buffers[d],
+                    block_sizes_x[d], block_sizes_y[d], block_sizes_z[d], border_index)));
             }
         } else if (border == FRONT || border == BACK) {
             int src_index = border == FRONT ? 0 : device_count - 1;
             int border_index = border == FRONT ? -1 : block_sizes_y[device_count - 1];
-            CHECK_CUDA_CALL_ERROR(cudaSetDevice(src_index));
-            CHECK_CUDA_CALL_ERROR(cudaMemcpy(dev_src, src, sizeof(double) * block_sizes_x[0] * block_sizes_z[0], cudaMemcpyHostToDevice));
-            set_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[src_index], dev_src,
-                block_sizes_x[src_index], block_sizes_y[src_index], block_sizes_z[src_index], border_index);
+            CUDA_ERR(cudaSetDevice(src_index));
+            CUDA_ERR(cudaMemcpy(dev_src, src, sizeof(double) * block_sizes_x[0] * block_sizes_z[0], cudaMemcpyHostToDevice));
+            START_KERNEL((set_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst[src_index], dev_src,
+                block_sizes_x[src_index], block_sizes_y[src_index], block_sizes_z[src_index], border_index)));
         }
     } else {
         printf("ERROR OCCURED\n");
@@ -316,62 +323,60 @@ void set_border_multigpu(double** dst, double* src, double* dev_src, double** bu
 int get_last_index(int split_type, int* block_sizes_x, int* block_sizes_y, int* block_sizes_z, int device)
 {
     int last_index;
-    if (split_type == UPDOWN)
+    if (split_type == UP_DOWN)
         last_index = block_sizes_z[device] - 1;
-    if (split_type == LEFTRIGHT)
+    if (split_type == LEFT_RIGHT)
         last_index = block_sizes_x[device] - 1;
-    if (split_type == FRONTBACK)
+    if (split_type == FRONT_BACK)
         last_index = block_sizes_y[device] - 1;
     return last_index;
 }
 
-void get_intergpu_border(double* dst, double* src, double* dev_buffer, int index, int block_size_x, int block_size_y, int block_size_z, int split_type)
+void get_intergpu_border(double* dst, double* src, double* dev_buffer, int index, mydim3<int> bsize, int split_type)
 {
     dim3 kernel_launch_grid = dim3(BORDER_OPERATIONS_GRID_DIM, BORDER_OPERATIONS_GRID_DIM);
     dim3 kernel_launch_block = dim3(BORDER_OPERATIONS_BLOCK_DIM, BORDER_OPERATIONS_BLOCK_DIM);
 
-    if (split_type == UPDOWN) {
-        get_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffer, src, block_size_x, block_size_y, block_size_z, index);
-        CHECK_CUDA_CALL_ERROR(cudaMemcpy(dst, dev_buffer, sizeof(double) * block_size_x * block_size_y, cudaMemcpyDeviceToHost));
-        CHECK_CUDA_KERNEL_ERROR();
-    } else if (split_type == LEFTRIGHT) {
-        get_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffer, src, block_size_x, block_size_y, block_size_z, index);
-        CHECK_CUDA_CALL_ERROR(cudaMemcpy(dst, dev_buffer, sizeof(double) * block_size_y * block_size_z, cudaMemcpyDeviceToHost));
-        CHECK_CUDA_KERNEL_ERROR();
-    } else if (split_type == FRONTBACK) {
-        get_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffer, src, block_size_x, block_size_y, block_size_z, index);
-        CHECK_CUDA_CALL_ERROR(cudaMemcpy(dst, dev_buffer, sizeof(double) * block_size_x * block_size_z, cudaMemcpyDeviceToHost));
-        CHECK_CUDA_KERNEL_ERROR();
+    if (split_type == UP_DOWN) {
+        START_KERNEL((get_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffer, src, bsize.x, bsize.y, bsize.z, index)));
+        CUDA_ERR(cudaMemcpy(dst, dev_buffer, sizeof(double) * bsize.x * bsize.y, cudaMemcpyDeviceToHost));
+    } else if (split_type == LEFT_RIGHT) {
+        START_KERNEL((get_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffer, src, bsize.x, bsize.y, bsize.z, index)));
+        CUDA_ERR(cudaMemcpy(dst, dev_buffer, sizeof(double) * bsize.y * bsize.z, cudaMemcpyDeviceToHost));
+    } else if (split_type == FRONT_BACK) {
+        START_KERNEL((get_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dev_buffer, src, bsize.x, bsize.y, bsize.z, index)));
+        CUDA_ERR(cudaMemcpy(dst, dev_buffer, sizeof(double) * bsize.x * bsize.z, cudaMemcpyDeviceToHost));
     } else {
         printf("ERROR OCCURED\n");
         exit(0);
     }
 }
 
-void set_intergpu_border(double* dst, double* src, double* dev_buffer, int index, int block_size_x, int block_size_y, int block_size_z, int split_type)
+void set_intergpu_border(double* dst, double* src, double* dev_buffer, int index, mydim3<int> bsize, int split_type)
 {
     dim3 kernel_launch_grid = dim3(BORDER_OPERATIONS_GRID_DIM, BORDER_OPERATIONS_GRID_DIM);
     dim3 kernel_launch_block = dim3(BORDER_OPERATIONS_BLOCK_DIM, BORDER_OPERATIONS_BLOCK_DIM);
 
-    if (split_type == UPDOWN) {
-        CHECK_CUDA_CALL_ERROR(cudaMemcpy(dev_buffer, src, sizeof(double) * block_size_x * block_size_y, cudaMemcpyHostToDevice));
-        set_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst, dev_buffer, block_size_x, block_size_y, block_size_z, index);
-        CHECK_CUDA_KERNEL_ERROR();
-    } else if (split_type == LEFTRIGHT) {
-        CHECK_CUDA_CALL_ERROR(cudaMemcpy(dev_buffer, src, sizeof(double) * block_size_y * block_size_z, cudaMemcpyHostToDevice));
-        set_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst, dev_buffer, block_size_x, block_size_y, block_size_z, index);
-        CHECK_CUDA_KERNEL_ERROR();
-    } else if (split_type == FRONTBACK) {
-        CHECK_CUDA_CALL_ERROR(cudaMemcpy(dev_buffer, src, sizeof(double) * block_size_x * block_size_z, cudaMemcpyHostToDevice));
-        set_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst, dev_buffer, block_size_x, block_size_y, block_size_z, index);
-        CHECK_CUDA_KERNEL_ERROR();
+    if (split_type == UP_DOWN) {
+        CUDA_ERR(cudaMemcpy(dev_buffer, src, sizeof(double) * bsize.x * bsize.y, cudaMemcpyHostToDevice));
+        START_KERNEL((set_updown_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst, dev_buffer, bsize.x, bsize.y, bsize.z, index)));
+    } else if (split_type == LEFT_RIGHT) {
+        CUDA_ERR(cudaMemcpy(dev_buffer, src, sizeof(double) * bsize.y * bsize.z, cudaMemcpyHostToDevice));
+        START_KERNEL((set_leftright_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst, dev_buffer, bsize.x, bsize.y, bsize.z, index)));
+    } else if (split_type == FRONT_BACK) {
+        CUDA_ERR(cudaMemcpy(dev_buffer, src, sizeof(double) * bsize.x * bsize.z, cudaMemcpyHostToDevice));
+        START_KERNEL((set_frontback_border_kernel<<<kernel_launch_grid, kernel_launch_block>>>(dst, dev_buffer, bsize.x, bsize.y, bsize.z, index)));
     } else {
         printf("ERROR OCCURED\n");
         exit(0);
     }
 }
 
-__global__ void compute_kernel(double* u_new, double* u, int block_size_x, int block_size_y, int block_size_z, double hx, double hy, double hz)
+__global__ void compute_kernel(
+    double* u_new, double* u,
+    Grid grid,
+    mydim3<int> bsize,
+    mydim3<double> h)
 {
     int id_x = threadIdx.x + blockIdx.x * blockDim.x;
     int id_y = threadIdx.y + blockIdx.y * blockDim.y;
@@ -381,23 +386,24 @@ __global__ void compute_kernel(double* u_new, double* u, int block_size_x, int b
     int offset_y = blockDim.y * gridDim.y;
     int offset_z = blockDim.z * gridDim.z;
 
-    for (int i = id_x; i < block_size_x; i += offset_x)
-        for (int j = id_y; j < block_size_y; j += offset_y)
-            for (int k = id_z; k < block_size_z; k += offset_z) {
-                double inv_hxsqr = 1.0 / (hx * hx);
-                double inv_hysqr = 1.0 / (hy * hy);
-                double inv_hzsqr = 1.0 / (hz * hz);
+    double inv_hxsqr = 1.0 / (h.x * h.x);
+    double inv_hysqr = 1.0 / (h.y * h.y);
+    double inv_hzsqr = 1.0 / (h.z * h.z);
 
-                double num = (u[cell_index(i + 1, j, k)] + u[cell_index(i - 1, j, k)]) * inv_hxsqr
-                    + (u[cell_index(i, j + 1, k)] + u[cell_index(i, j - 1, k)]) * inv_hysqr
-                    + (u[cell_index(i, j, k + 1)] + u[cell_index(i, j, k - 1)]) * inv_hzsqr;
+    for (int i = id_x; i < bsize.x; i += offset_x)
+        for (int j = id_y; j < bsize.y; j += offset_y)
+            for (int k = id_z; k < bsize.z; k += offset_z) {
+
+                double num = (u[grid.cell_absolute_id(i + 1, j, k)] + u[grid.cell_absolute_id(i - 1, j, k)]) * inv_hxsqr
+                    + (u[grid.cell_absolute_id(i, j + 1, k)] + u[grid.cell_absolute_id(i, j - 1, k)]) * inv_hysqr
+                    + (u[grid.cell_absolute_id(i, j, k + 1)] + u[grid.cell_absolute_id(i, j, k - 1)]) * inv_hzsqr;
                 double denum = 2.0 * (inv_hxsqr + inv_hysqr + inv_hzsqr);
 
-                u_new[cell_index(i, j, k)] = num / denum;
+                u_new[grid.cell_absolute_id(i, j, k)] = num / denum;
             }
 }
 
-__global__ void abs_error_kernel(double* u1, double* u2, int block_size_x, int block_size_y, int block_size_z)
+__global__ void abs_error_kernel(double* u1, double* u2, Grid grid, mydim3<int> bsize)
 {
     int id_x = threadIdx.x + blockIdx.x * blockDim.x;
     int id_y = threadIdx.y + blockIdx.y * blockDim.y;
@@ -407,9 +413,11 @@ __global__ void abs_error_kernel(double* u1, double* u2, int block_size_x, int b
     int offset_y = blockDim.y * gridDim.y;
     int offset_z = blockDim.z * gridDim.z;
 
-    for (int i = id_x - 1; i < block_size_x + 1; i += offset_x)
-        for (int j = id_y - 1; j < block_size_y + 1; j += offset_y)
-            for (int k = id_z - 1; k < block_size_z + 1; k += offset_z) {
-                u1[cell_index(i, j, k)] = fabsf(u1[cell_index(i, j, k)] - u2[cell_index(i, j, k)]);
+    for (int i = id_x - 1; i < bsize.x + 1; i += offset_x) {
+        for (int j = id_y - 1; j < bsize.y + 1; j += offset_y) {
+            for (int k = id_z - 1; k < bsize.z + 1; k += offset_z) {
+                u1[grid.cell_absolute_id(i, j, k)] = fabsf(u1[grid.cell_absolute_id(i, j, k)] - u2[grid.cell_absolute_id(i, j, k)]);
             }
+        }
+    }
 }
