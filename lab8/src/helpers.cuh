@@ -1,6 +1,8 @@
 #ifndef HELPERS_CUH
 #define HELPERS_CUH
 
+#include <cstdio>
+
 #define CUDA_ERR(k)                                               \
     do {                                                          \
         cudaError_t call = (k);                                   \
@@ -40,6 +42,9 @@ cudaError_t cudaSetDevice(int);
 #define cudaMemcpyHostToDevice 1
 
 cudaError_t cudaMemcpy(void*, void*, int, int);
+template<class abuse>
+cudaError_t cudaMalloc(abuse, int);
+cudaError_t cudaFree(void*);
 #endif
 
 #endif // HELPERS_CUH

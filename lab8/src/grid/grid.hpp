@@ -5,7 +5,16 @@
 
 #include "helpers.cuh"
 
-struct Grid {
+struct BlockGrid {
+    mydim3<int> bsize;
+
+    __host__ __device__ size_t cell_absolute_id(int i, int j, int k) const;
+    __host__ __device__ size_t cell_absolute_id(mydim3<int> p) const;
+    mydim3<int> cell_idx(int n) const;
+    size_t cells_per_block() const;
+};
+
+struct Grid : BlockGrid {
     const int process_rank;
     const int n_processes;
 
@@ -22,12 +31,6 @@ struct Grid {
 
     int block_absolute_id(int i, int j, int k) const;
     mydim3<int> block_idx() const;
-
-    __host__ __device__ size_t cell_absolute_id(int i, int j, int k) const;
-
-    mydim3<int> cell_idx(int n) const;
-
-    size_t cells_per_block() const;
 
     //@ ну да, это скорее к Problem относится@
     mydim3<double> height(const mydim3<double>& l_size) const;

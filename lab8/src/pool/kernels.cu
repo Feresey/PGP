@@ -1,12 +1,11 @@
 #include <cmath>
 #include <vector>
 
-#include <thrust/device_vector.h>
-
 #include "dim3/dim3.hpp"
 #include "grid/grid.hpp"
 #include "helpers.cuh"
 #include "kernels.hpp"
+#include "myvector/vector.cuh"
 
 #define BORDER_GRID_DIM 32
 #define BORDER_BLOCK_DIM 32
@@ -17,7 +16,7 @@
 
 __global__ void get_border_kernel(
     double* out, double* buf,
-    Grid grid, int a_size, int b_size,
+    BlockGrid grid, int a_size, int b_size,
     int border_idx, layer_tag tag)
 {
     const int id_a = threadIdx.x + blockIdx.x * blockDim.x,
@@ -36,7 +35,7 @@ __global__ void get_border_kernel(
             case FRONT_BACK:
                 temp = buf[grid.cell_absolute_id(a, border_idx, b)];
                 break;
-            case TOP_BOTTOM:
+            case VERTICAL:
                 temp = buf[grid.cell_absolute_id(a, b, border_idx)];
                 break;
             }
@@ -48,7 +47,7 @@ __global__ void get_border_kernel(
 
 __global__ void set_border_kernel(
     double* dest, double* buf,
-    Grid grid, int a_size, int b_size,
+    BlockGrid grid, int a_size, int b_size,
     int border_idx,
     layer_tag tag)
 {
@@ -68,7 +67,7 @@ __global__ void set_border_kernel(
             case FRONT_BACK:
                 dest_idx = grid.cell_absolute_id(a, border_idx, b);
                 break;
-            case TOP_BOTTOM:
+            case VERTICAL:
                 dest_idx = grid.cell_absolute_id(a, b, border_idx);
                 break;
             }
@@ -80,7 +79,7 @@ __global__ void set_border_kernel(
 
 __global__ void compute_kernel(
     double* out, double* data,
-    Grid grid,
+    BlockGrid grid,
     mydim3<int> bsize,
     mydim3<double> h)
 {
@@ -110,7 +109,7 @@ __global__ void compute_kernel(
     }
 }
 
-__global__ void abs_error_kernel(double* out, double* data, Grid grid, mydim3<int> bsize)
+__global__ void abs_error_kernel(double* out, double* data, BlockGrid grid, mydim3<int> bsize)
 {
     const int id_x = threadIdx.x + blockIdx.x * blockDim.x,
               id_y = threadIdx.y + blockIdx.y * blockDim.y,
@@ -130,24 +129,33 @@ __global__ void abs_error_kernel(double* out, double* data, Grid grid, mydim3<in
 
 /* METHODS */
 
+void DeviceProblem::set_device(int device) const
+{
+    CUDA_ERR(cudaSetDevice(device));
+}
+
 void DeviceProblem::get_border(
-    thrust::device_vector<double>& out, thrust::device_vector<double> data,
+    std::vector<double>& out, std::vector<double> data,
     int a_size, int b_size,
     int border_idx, layer_tag tag)
 {
-    double *out_raw = out.data().get(),
-           *data_raw = data.data().get();
-    START_KERNEL((get_border_kernel<<<BORDER_DIMS>>>(out_raw, data_raw, grid, a_size, b_size, border_idx, tag)));
+    DeviceVector<double> device_out(out), device_data(data);
+    START_KERNEL((get_border_kernel<<<BORDER_DIMS>>>(
+        device_out.device_data, device_data.device_data,
+        grid, a_size, b_size,
+        border_idx, tag)));
 }
 
 void DeviceProblem::set_border(
-    thrust::device_vector<double>& dest, thrust::device_vector<double> data,
+    std::vector<double>& dest, std::vector<double> data,
     int a_size, int b_size,
     int border_idx, layer_tag tag)
 {
-    double *dest_raw = dest.data().get(),
-           *data_raw = data.data().get();
-    START_KERNEL((set_border_kernel<<<BORDER_DIMS>>>(dest_raw, data_raw, grid, a_size, b_size, border_idx, tag)));
+    DeviceVector<double> device_dest(dest), device_data(data);
+    START_KERNEL((set_border_kernel<<<BORDER_DIMS>>>(
+        device_dest.device_data, device_data.device_data,
+        grid, a_size, b_size,
+        border_idx, tag)));
 }
 
 dim3 get_grid_dim(const DeviceProblem* dp)
@@ -160,27 +168,18 @@ dim3 get_block_dim(const DeviceProblem* dp)
     return dim3(dp->kernel_block_dim, dp->kernel_block_dim, dp->kernel_block_dim);
 }
 
-void DeviceProblem::compute(
-    thrust::device_vector<double>& out,
-    thrust::device_vector<double>& data,
-    mydim3<double> height)
+void DeviceProblem::compute(std::vector<double>& out, std::vector<double>& data, mydim3<double> height)
 {
-    double *out_raw = out.data().get(),
-           *data_raw = data.data().get();
-
+    DeviceVector<double> device_dest(out), device_data(data);
     START_KERNEL((
         compute_kernel<<<get_grid_dim(this), get_block_dim(this)>>>(
-            out_raw, data_raw, grid, grid.bsize, height)));
+            device_dest.device_data, device_data.device_data, grid, grid.bsize, height)));
 }
 
-void DeviceProblem::calc_abs_error(
-    thrust::device_vector<double>& out,
-    thrust::device_vector<double>& data)
+void DeviceProblem::calc_abs_error(std::vector<double>& out, std::vector<double>& data)
 {
-    double *out_raw = out.data().get(),
-           *data_raw = data.data().get();
-
+    DeviceVector<double> device_dest(out), device_data(data);
     START_KERNEL((
         abs_error_kernel<<<get_grid_dim(this), get_block_dim(this)>>>(
-            out_raw, data_raw, grid, grid.bsize)));
+            device_dest.device_data, device_data.device_data, grid, grid.bsize)));
 }
