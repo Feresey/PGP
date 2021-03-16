@@ -8,8 +8,6 @@
 
 #include "grid/grid.hpp"
 
-#include "problem.hpp"
-
 class Solver {
     const Grid& grid;
     const Task& task;
@@ -22,7 +20,7 @@ class Solver {
 
 public:
     Solver(const Grid& grid, const Task& task);
-    void solve(Problem& problem, const std::string& output);
+    void solve(GPU_pool& pool, const std::string& output);
 };
 
 #endif

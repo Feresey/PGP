@@ -18,20 +18,17 @@ clean:
 $(DEPS_DIR) $(BUILDDIR) $(BINDIR):
 	-mkdir -p "$@"
 
-HEADERS     = helpers.hpp grid/grid.hpp dim3/dim3.hpp \
-			problem.hpp solver.hpp exchange.hpp kernels.hpp helpers.cuh
+HEADERS = solver.hpp exchange.hpp helpers.cuh \
+		grid/grid.hpp dim3/dim3.hpp \
+		pool/pool.hpp pool/task.hpp pool/kernels.hpp \
+		myvector/vector.cuh
 
-ifeq ($(CUDA),off)
-CPP_SOURCES = main.cpp grid/grid.cpp dim3/dim3.cpp \
-			solver.cpp common.cpp problem.cpp exchange.cpp
+CU_SOURCES  = pool/kernels.cu pool/pool.cu grid/grid.cu
+CPP_SOURCES = main.cpp solver.cpp exchange.cpp \
+		dim3/dim3.cpp \
+		pool/kernels.cpp pool/pool.cpp pool/task.cpp
 
 SOURCES = $(CPP_SOURCES)
-
-else
-CU_SOURCES  = kernels.cu grid/grid.cu
-CPP_SOURCES = main.cpp dim3/dim3.cpp \
-			solver.cpp common.cpp problem.cpp exchange.cpp
-endif
 
 COPY_TARGETS = $(addprefix COPY_,$(CPP_SOURCES) $(HEADERS))
 
@@ -48,54 +45,82 @@ endef
 copy: $(COPY_TARGETS)
 	$(file > $(DESTDIR)/Makefile,$(stupidmake))
 
-DEPS_LIST = $(foreach dep,$(SOURCES),$(DEPS_DIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(dep))).mk)
+CPP_DEPS_LIST = $(foreach dep,$(CPP_SOURCES),$(DEPS_DIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(dep))).mk)
+CU_DEPS_LIST = $(foreach dep,$(CU_SOURCES),$(DEPS_DIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(dep))).mk)
 
+show:
+	@echo $(CPP_DEPS_LIST)
+	@echo $(CU_DEPS_LIST)
+
+$(CPP_DEPS_LIST): COMPILE=$(CXX) $(IFLAGS)
+$(CU_DEPS_LIST): COMPILE=$(NVCC) $(IFLAGS)
+
+DEPS_LIST = $(CU_DEPS_LIST) $(CPP_DEPS_LIST)
 $(DEPS_LIST): $(DEPS_DIR)/%.mk: | $(DEPS_DIR)
 	@echo $*
-	$(file > $@,$(patsubst %.cpp,$(BUILDDIR)/%.cpp.o,$*): $(shell $(CXX) $(IFLAGS) -E $(subst __,/,$*) | \
+	$(file > $@,$(patsubst %.cu,$(BUILDDIR)/%.cu.o,$(patsubst %.cpp,$(BUILDDIR)/%.cpp.o,$*)): \
+		$(shell $(COMPILE) -E $(subst __,/,$*) | \
 		grep -Eo '#\s[0-9]+\s".*$$' - | \
 		sed -re 's|#\s[0-9]+\s"(.*?)".*$$|\1|gi' | \
-		grep -v -e "^/usr" -e "^<" | \
+		grep -v -e "^/usr/include" -e "^<" -e "^/opt/cuda/include/" | \
 		sort -u | \
 		$(if $(patsubst %.hpp,,$*),,grep -v -e "$*" |) \
-		xargs -n1 realpath --relative-to $(CURDIR)))
+		xargs -n1 realpath --relative-to $(CURDIR) | \
+		sort -u \
+		))
 
 .PHONY: deps.mk
 deps.mk: $(DEPS_LIST) | $(DEPS_DIR)
 	@cat $(sort $(DEPS_LIST)) > $@
 
--include deps.mk
+# -include deps.mk
 
 CPP_OBJECTS = $(foreach obj,$(CPP_SOURCES),$(BUILDDIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(obj))).o)
+CU_OBJECTS = $(foreach obj,$(CU_SOURCES),$(BUILDDIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(obj))).o)
 
-TARGET_OBJECTS = $(CPP_OBJECTS)
-
-show:
-	@echo $(TARGET_OBJECTS)
+TARGET_OBJECTS = $(CPP_OBJECTS) $(CU_OBJECTS)
 
 LDFLAGS = -lm -lmpi
 
 IFLAGS = -I.
 
-CFLAGS = -W -Wall -Wextra -Wpedantic \
+CFLAGS ?= --std=c++11 \
+		-W -Wall -Wextra \
 		-Wno-long-long \
 		-Wconversion -Wsign-conversion -Wno-sign-compare \
 		-Winit-self \
 		-Wctor-dtor-privacy -Wnon-virtual-dtor \
-		-Wold-style-cast \
 		-Wunreachable-code -fstack-protector \
-		--std=c++14
+
+NVCCFLAGS ?= --std=c++11 -rdc=true\
+		-Werror cross-execution-space-call \
+		-arch=sm_35 -Wno-deprecated-gpu-targets \
+		-D_FORCE_INLINES -Xcompiler -fPIC \
+		-Wno-deprecated-declarations
 
 ifeq ($(BENCH),on)
-CFLAGS = -O3
+CFLAGS    = -O3
+NVCCFLAGS += -DBENCHMARK
+NVCCFLAGS += -O3
 else
-CFLAGS += -g3
+CFLAGS    += -g3
+NVCCFLAGS += -G
 endif
+NVCCFLAGS += --compiler-options "$(CFLAGS)"
+
+define stupidmake
+all:
+	$(NVCC) -ccbin=$(MPICXX) $(NVCCFLAGS) $(IFLAGS) $(LDFLAGS) $(CU_SOURCES) $(CPP_SOURCES) -o $(TARGET)
+endef
+
 
 $(TARGET_BIN): $(TARGET_OBJECTS) | $(BINDIR)
-	@echo $@
-	$(MPICXX) $(CFLAGS) $(IFLAGS) $(LDFLAGS) $^ -o $@
+	$(NVCC) -ccbin=$(MPICXX) $(NVCCFLAGS) $(IFLAGS) $(LDFLAGS) $^ -o $@
 
 $(CPP_OBJECTS): $(BUILDDIR)/%: | $(BUILDDIR)
 	@echo $@
 	$(CXX) $(CFLAGS) $(IFLAGS) -c $(patsubst $(BUILDDIR)/%.cpp.o,%.cpp,$(subst __,/,$@)) -o $@
+
+$(CU_OBJECTS): $(BUILDDIR)/%: | $(BUILDDIR)
+	@echo $@
+	$(NVCC) $(NVCCFLAGS) $(IFLAGS) -c $(patsubst $(BUILDDIR)/%.cu.o,%.cu,$(subst __,/,$@)) -o $@

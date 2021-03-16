@@ -37,6 +37,7 @@ static const dim3 threadIdx, threadDim, blockIdx, blockDim, gridIdx, gridDim;
 cudaError_t cudaGetLastError();
 char* cudaGetErrorString(cudaError_t);
 cudaError_t cudaSetDevice(int);
+cudaError_t cudaGetDeviceCount(int*);
 
 #define cudaMemcpyDeviceToHost 0
 #define cudaMemcpyHostToDevice 1

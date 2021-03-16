@@ -4,12 +4,13 @@
 #include <functional>
 
 #include "grid/grid.hpp"
-#include "problem.hpp"
+#include "pool/pool.hpp"
 
 class Exchange {
     const Grid& grid;
     const Task& task;
-    Problem& problem;
+
+    GPU_pool& pool;
 
     std::vector<double> send_buffer;
     std::vector<double> receive_buffer;
@@ -25,7 +26,7 @@ class Exchange {
     void write_layer(int j, int k, int block_idx, std::ostream& out);
 
 public:
-    Exchange(const Grid& grid, const Task& task, Problem& problem);
+    Exchange(const Grid& grid, const Task& task, GPU_pool& pool);
     void boundary_layer_exchange();
 
     void write_result(std::ostream& out);

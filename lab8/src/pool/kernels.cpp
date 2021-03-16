@@ -3,6 +3,7 @@
 dim3_type layer_tag_to_dim3_type(layer_tag tag)
 {
     switch (tag) {
+    default:
     case LEFT_RIGHT:
         return DIM3_TYPE_X;
     case FRONT_BACK:
@@ -15,6 +16,7 @@ dim3_type layer_tag_to_dim3_type(layer_tag tag)
 layer_tag dim3_type_to_layer_tag(dim3_type type)
 {
     switch (type) {
+    default:
     case DIM3_TYPE_X:
         return LEFT_RIGHT;
     case DIM3_TYPE_Y:
@@ -26,7 +28,7 @@ layer_tag dim3_type_to_layer_tag(dim3_type type)
 
 DeviceProblem::DeviceProblem(
     const BlockGrid& grid, const int n_devices,
-    const int kernel_grid_dim = 8, const int kernel_block_dim = 8)
+    const int kernel_grid_dim, const int kernel_block_dim)
     : grid(grid)
     , n_devices(n_devices)
     , kernel_grid_dim(kernel_grid_dim)

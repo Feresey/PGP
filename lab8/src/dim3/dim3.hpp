@@ -58,7 +58,6 @@ public:
         difference_type get_type() const { return difference_type(index); }
 
         reference operator*() { return data->operator[](difference_type(index)); }
-        const reference operator*() const { return (*data)[difference_type(index)]; }
 
         difference_type operator-(const iterator& rhs) { return difference_type(this->index - rhs.index); }
         bool operator==(const iterator& rhs) { return this->index == rhs.index; }

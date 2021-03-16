@@ -1,5 +1,23 @@
 #include "pool.hpp"
 
+GPU_pool::Elem::Elem(const BlockGrid& grid, int max_dim)
+    : grid(grid)
+    , host_buffer(max_dim * max_dim)
+{
+}
+
+GPU_pool::Elem::~Elem()
+{
+    CUDA_ERR(cudaFree(gpu_data));
+    CUDA_ERR(cudaFree(gpu_data_next));
+    CUDA_ERR(cudaFree(gpu_buffer));
+}
+
+int GPU_pool::get_devices() const {
+    int n_devices;
+	CUDA_ERR(cudaGetDeviceCount(&n_devices));
+}
+
 void GPU_pool::init_devices(int max_dim)
 {
     std::vector<double> temp(max_dim * max_dim);
@@ -8,7 +26,9 @@ void GPU_pool::init_devices(int max_dim)
         Elem& device = *device_it;
         int device_id = int(std::distance(devices.begin(), device_it));
 
-        const int buffer_size = device.grid.cells_per_block() * sizeof(double);
+        const uint buffer_size = uint(device.grid.cells_per_block()) * sizeof(double);
+
+        CUDA_ERR(cudaSetDevice(device_id));
 
         CUDA_ERR(cudaMalloc(&device.gpu_data, buffer_size));
         CUDA_ERR(cudaMalloc(&device.gpu_data_next, buffer_size));
@@ -29,14 +49,5 @@ void GPU_pool::init_devices(int max_dim)
         }
 
         CUDA_ERR(cudaMemcpy(device.gpu_data, temp.data(), buffer_size, cudaMemcpyHostToDevice));
-    }
-}
-
-void GPU_pool::free_devices()
-{
-    for (Elem& device : devices) {
-        CUDA_ERR(cudaFree(device.gpu_data));
-        CUDA_ERR(cudaFree(device.gpu_data_next));
-        CUDA_ERR(cudaFree(device.gpu_buffer));
     }
 }

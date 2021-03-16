@@ -1,7 +1,17 @@
-#include <cfloat>
+#include "task.hpp"
 
-#include "helpers.hpp"
-#include "solver.hpp"
+void Task::mpi_bcast()
+{
+    l_size.mpi_bcast();
+    bcast_double(&eps);
+    bcast_double(&u_top);
+    bcast_double(&u_bottom);
+    bcast_double(&u_left);
+    bcast_double(&u_right);
+    bcast_double(&u_front);
+    bcast_double(&u_back);
+    bcast_double(&u_0);
+}
 
 std::istream& operator>>(std::istream& in, Task& task)
 {
@@ -29,26 +39,4 @@ std::ostream& operator<<(std::ostream& out, const Task& task)
         << std::endl
         << "u_0: " << task.u_0;
     return out;
-}
-
-std::ostream& operator<<(std::ostream& out, const Solver& solver)
-{
-    out << solver.grid
-        << std::endl
-        << solver.task
-        << std::endl;
-    return out;
-}
-
-void Task::mpi_bcast()
-{
-    l_size.mpi_bcast();
-    bcast_double(&eps);
-    bcast_double(&u_top);
-    bcast_double(&u_bottom);
-    bcast_double(&u_left);
-    bcast_double(&u_right);
-    bcast_double(&u_front);
-    bcast_double(&u_back);
-    bcast_double(&u_0);
 }

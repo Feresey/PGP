@@ -5,6 +5,7 @@
 
 #include "grid/grid.hpp"
 #include "kernels.hpp"
+#include "task.hpp"
 
 struct split_by {
     int part_size, rest, n_parts;
@@ -15,29 +16,38 @@ class GPU_pool {
     const Grid& grid;
     const layer_tag split_type;
 
+    Task task;
+    mydim3<double> height;
+
+    std::vector<int> data_next;
+    std::vector<int> buffer;
+
     struct Elem {
         BlockGrid grid;
 
-        int* gpu_data;
-        int* gpu_data_next;
-        int* gpu_buffer;
+        std::vector<double> host_data;
+        std::vector<double> host_buffer;
+
+        double* gpu_data;
+        double* gpu_data_next;
+        double* gpu_buffer;
 
         Elem(const BlockGrid& grid, int max_dim);
         ~Elem();
     };
 
-    std::vector<int> data;
-    std::vector<int> data_next;
-    std::vector<int> buffer;
-
     std::vector<Elem> devices;
 
     void init_devices(int max_dim);
-    void free_devices();
+
+    int get_devices()const;
 
 public:
-    GPU_pool(int n_devices, const Grid& grid);
-    ~GPU_pool();
+    std::vector<int> data;
+
+    GPU_pool(const Grid& grid, Task task);
+
+    double calc();
 };
 
 #endif

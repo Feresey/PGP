@@ -10,6 +10,8 @@
 #include <time.h>
 
 #include "grid/grid.hpp"
+#include "pool/task.hpp"
+#include "pool/pool.hpp"
 #include "helpers.hpp"
 #include "solver.hpp"
 
@@ -44,14 +46,14 @@ int main(int argc, char** argv)
     grid.mpi_bcast();
     task.mpi_bcast();
 
-    Problem problem(task, grid);
+    GPU_pool pool= GPU_pool(grid, task);
     Solver solver(grid, task);
 
     std::cout << solver << std::endl;
 
     std::cout.flush();
 
-    solver.solve(problem, output);
+    solver.solve(pool, output);
 
     MPI_ERR(MPI_Finalize());
 }

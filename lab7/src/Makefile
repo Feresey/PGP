@@ -50,7 +50,9 @@ $(DEPS_LIST): $(DEPS_DIR)/%.mk: | $(DEPS_DIR)
 		grep -v -e "^/usr" -e "^<" | \
 		sort -u | \
 		$(if $(patsubst %.hpp,,$*),,grep -v -e "$*" |) \
-		xargs -n1 realpath --relative-to $(CURDIR)))
+		xargs -n1 realpath --relative-to $(CURDIR) | \
+		sort -u \
+		))
 
 .PHONY: deps.mk
 deps.mk: $(DEPS_LIST) | $(DEPS_DIR)

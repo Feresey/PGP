@@ -11,17 +11,26 @@ Solver::Solver(const Grid& grid, const Task& task)
 {
 }
 
-void Solver::solve(Problem& problem, const std::string& output)
+std::ostream& operator<<(std::ostream& out, const Solver& solver)
 {
-    Exchange exchange(grid, task, problem);
+    out << solver.grid
+        << std::endl
+        << solver.task
+        << std::endl;
+    return out;
+}
+
+void Solver::solve(GPU_pool& pool, const std::string& output)
+{
+    Exchange exchange(grid, task, pool);
 
     MPI_Barrier(MPI_COMM_WORLD);
-    double error = DBL_MAX;
+    double error = 100.0;
     while (error > task.eps) {
         exchange.boundary_layer_exchange();
         MPI_Barrier(MPI_COMM_WORLD);
 
-        double local_error = problem.calc();
+        double local_error = pool.calc();
         // exchange.write_result(std::cerr);
         error = this->calc_error(local_error);
     }
@@ -37,7 +46,7 @@ void Solver::solve(Problem& problem, const std::string& output)
 
 double Solver::calc_error(double local_error) const
 {
-    double all_error = DBL_MAX;
+    double all_error = 100.0;
     MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD));
 
     return all_error;

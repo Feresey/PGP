@@ -29,12 +29,15 @@ split_by::split_by(int need_split, int n_parts, int min_part_size)
 // Нет смысла делить маленькие данные, проще (и быстрее) запихнуть их на один GPU
 #define MIN_GPU_SPLIT_SIZE 5000
 
-GPU_pool::GPU_pool(int n_devices, const Grid& grid)
+GPU_pool::GPU_pool(const Grid& grid, Task task)
     : grid(grid)
+    , task(task)
     //@ данные для разных GPU будут разделяться по наибольшей стороне блока.@
     //@ Да, можно сделать лучше.@
     , split_type(dim3_type_to_layer_tag(grid.bsize.max_dim().get_type()))
 {
+    int n_devices = this->get_devices();
+
     auto max_elem = grid.bsize.max_dim();
     int max_dim = *max_elem;
 
@@ -56,13 +59,8 @@ GPU_pool::GPU_pool(int n_devices, const Grid& grid)
 
     int max_rest_dim = *rest_dim.max_dim();
 
-    this->devices = std::vector<Elem>(size_t(split.n_parts), Elem(BlockGrid{init_dim}, max_rest_dim));
-    this->devices.back() = Elem(BlockGrid{rest_dim}, max_rest_dim);
+    this->devices = std::vector<Elem>(size_t(split.n_parts), Elem(BlockGrid { init_dim }, max_rest_dim));
+    this->devices.back() = Elem(BlockGrid { rest_dim }, max_rest_dim);
 
     this->init_devices(max_dim);
-}
-
-GPU_pool::~GPU_pool()
-{
-    this->free_devices();
 }
