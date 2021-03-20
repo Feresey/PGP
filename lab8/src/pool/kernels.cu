@@ -1,6 +1,9 @@
 #include <cmath>
 #include <vector>
 
+#include <thrust/device_ptr.h>
+#include <thrust/extrema.h>
+
 #include "dim3/dim3.hpp"
 #include "grid/grid.hpp"
 #include "helpers.cuh"
@@ -10,7 +13,8 @@
 #define BORDER_GRID_DIM 32
 #define BORDER_BLOCK_DIM 32
 
-#define BORDER_DIMS dim3(BORDER_BLOCK_DIM, BORDER_BLOCK_DIM), dim3(BORDER_GRID_DIM, BORDER_GRID_DIM)
+#define BORDER_DIMS_2D dim3(BORDER_BLOCK_DIM, BORDER_BLOCK_DIM), dim3(BORDER_GRID_DIM, BORDER_GRID_DIM)
+#define BORDER_DIMS_3D(BLOCK_DIM, GRID_DIM) dim3(BLOCK_DIM, BLOCK_DIM, BLOCK_DIM), dim3(GRID_DIM, GRID_DIM, GRID_DIM)
 
 /* KERNELS */
 
@@ -121,65 +125,102 @@ __global__ void abs_error_kernel(double* out, double* data, BlockGrid grid, mydi
     for (int i = id_x - 1; i <= bsize.x; i += offset_x) {
         for (int j = id_y - 1; j <= bsize.y; j += offset_y) {
             for (int k = id_z - 1; k <= bsize.z; k += offset_z) {
-                out[grid.cell_absolute_id(i, j, k)] = fabsf(out[grid.cell_absolute_id(i, j, k)] - data[grid.cell_absolute_id(i, j, k)]);
+                int cell_id = grid.cell_absolute_id(i, j, k);
+                out[cell_id] = fabsf(out[cell_id] - data[cell_id]);
             }
         }
     }
 }
 
-/* METHODS */
+/* CXX API */
 
-void DeviceProblem::set_device(int device) const
+DeviceProblem::DeviceProblem(BlockGrid grid, int kernel_grid_dim, int kernel_block_dim)
+    : grid(grid)
+    , kernel_grid_dim(kernel_grid_dim)
+    , kernel_block_dim(kernel_block_dim)
 {
-    CUDA_ERR(cudaSetDevice(device));
 }
 
 void DeviceProblem::get_border(
-    std::vector<double>& out, std::vector<double> data,
+    double* out, double* data,
     int a_size, int b_size,
     int border_idx, layer_tag tag)
 {
-    DeviceVector<double> device_out(out), device_data(data);
-    START_KERNEL((get_border_kernel<<<BORDER_DIMS>>>(
-        device_out.device_data, device_data.device_data,
+    START_KERNEL((get_border_kernel<<<BORDER_DIMS_2D>>>(
+        out, data,
         grid, a_size, b_size,
         border_idx, tag)));
 }
 
 void DeviceProblem::set_border(
-    std::vector<double>& dest, std::vector<double> data,
+    double* dest, double* data,
     int a_size, int b_size,
     int border_idx, layer_tag tag)
 {
-    DeviceVector<double> device_dest(dest), device_data(data);
-    START_KERNEL((set_border_kernel<<<BORDER_DIMS>>>(
-        device_dest.device_data, device_data.device_data,
+    START_KERNEL((set_border_kernel<<<BORDER_DIMS_2D>>>(
+        dest, data,
         grid, a_size, b_size,
         border_idx, tag)));
 }
 
-dim3 get_grid_dim(const DeviceProblem* dp)
+void DeviceProblem::compute(double* out, double* data, mydim3<double> height)
 {
-    return dim3(dp->kernel_grid_dim, dp->kernel_grid_dim, dp->kernel_grid_dim);
-}
-
-dim3 get_block_dim(const DeviceProblem* dp)
-{
-    return dim3(dp->kernel_block_dim, dp->kernel_block_dim, dp->kernel_block_dim);
-}
-
-void DeviceProblem::compute(std::vector<double>& out, std::vector<double>& data, mydim3<double> height)
-{
-    DeviceVector<double> device_dest(out), device_data(data);
     START_KERNEL((
-        compute_kernel<<<get_grid_dim(this), get_block_dim(this)>>>(
-            device_dest.device_data, device_data.device_data, grid, grid.bsize, height)));
+        compute_kernel<<<BORDER_DIMS_3D(kernel_block_dim, kernel_grid_dim)>>>(
+            out, data, grid, grid.bsize, height)));
 }
 
-void DeviceProblem::calc_abs_error(std::vector<double>& out, std::vector<double>& data)
+double DeviceProblem::calc_abs_error(double* out, double* data)
 {
-    DeviceVector<double> device_dest(out), device_data(data);
     START_KERNEL((
-        abs_error_kernel<<<get_grid_dim(this), get_block_dim(this)>>>(
-            device_dest.device_data, device_data.device_data, grid, grid.bsize)));
+        abs_error_kernel<<<BORDER_DIMS_3D(kernel_block_dim, kernel_grid_dim)>>>(
+            out, data, grid, grid.bsize)));
+
+    thrust::device_ptr<double> dev_ptr = thrust::device_pointer_cast(out);
+    double error = *thrust::max_element(dev_ptr, dev_ptr + grid.cells_per_block());
+
+    CUDA_ERR(cudaGetLastError());
+    return error;
+}
+
+dim3_type side_tag_to_dim3_type(side_tag tag)
+{
+    switch (tag) {
+    default:
+    case LEFT:
+    case RIGHT:
+        return DIM3_TYPE_X;
+    case FRONT:
+    case BACK:
+        return DIM3_TYPE_Y;
+    case TOP:
+    case BOTTOM:
+        return DIM3_TYPE_Z;
+    }
+}
+
+dim3_type layer_tag_to_dim3_type(layer_tag tag)
+{
+    switch (tag) {
+    default:
+    case LEFT_RIGHT:
+        return DIM3_TYPE_X;
+    case FRONT_BACK:
+        return DIM3_TYPE_Y;
+    case VERTICAL:
+        return DIM3_TYPE_Z;
+    }
+}
+
+layer_tag dim3_type_to_layer_tag(dim3_type type)
+{
+    switch (type) {
+    default:
+    case DIM3_TYPE_X:
+        return LEFT_RIGHT;
+    case DIM3_TYPE_Y:
+        return FRONT_BACK;
+    case DIM3_TYPE_Z:
+        return VERTICAL;
+    }
 }

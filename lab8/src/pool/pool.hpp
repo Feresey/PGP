@@ -13,24 +13,25 @@ struct split_by {
 };
 
 class GPU_pool {
-    const Grid& grid;
     const layer_tag split_type;
-
+    const Grid& grid;
+    const mydim3<double> height;
     Task task;
-    mydim3<double> height;
 
-    std::vector<int> data_next;
-    std::vector<int> buffer;
+    std::vector<double> buffer;
 
-    struct Elem {
-        BlockGrid grid;
-
+    struct Elem : public DeviceProblem {
         std::vector<double> host_data;
-        std::vector<double> host_buffer;
 
         double* gpu_data;
         double* gpu_data_next;
         double* gpu_buffer;
+
+        void load_border(int layer_idx, layer_tag tag);
+        void store_border(int layer_idx, layer_tag tag);
+        void set_device(int device_id) const;
+
+        double compute(mydim3<double> height);
 
         Elem(const BlockGrid& grid, int max_dim);
         ~Elem();
@@ -39,14 +40,21 @@ class GPU_pool {
     std::vector<Elem> devices;
 
     void init_devices(int max_dim);
-
-    int get_devices()const;
+    int get_devices() const;
 
 public:
-    std::vector<int> data;
+    std::vector<double> data;
 
     GPU_pool(const Grid& grid, Task task);
 
+    // texcl=true
+
+    // загружает данные с GPU в поле data.
+    void load_gpu_data(side_tag tag);
+    // загружает данные на GPU из поля data.
+    void store_gpu_data(side_tag tag);
+
+    // выполняет вычисления
     double calc();
 };
 

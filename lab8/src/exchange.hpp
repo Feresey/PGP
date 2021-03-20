@@ -19,7 +19,7 @@ class Exchange {
         const int block_idx, const int n_blocks, const int cell_size,
         const int a_size, const int b_size,
         const double lower_init, const double upper_init,
-        const int recvtag_lower, const int recvtag_upper,
+        const side_tag lower, const side_tag tag_upper,
         std::function<size_t(int my, int a, int b)> get_cell_idx,
         std::function<int(int)> get_block_idx);
 

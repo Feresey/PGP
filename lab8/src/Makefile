@@ -62,7 +62,7 @@ $(DEPS_LIST): $(DEPS_DIR)/%.mk: | $(DEPS_DIR)
 		$(shell $(COMPILE) -E $(subst __,/,$*) | \
 		grep -Eo '#\s[0-9]+\s".*$$' - | \
 		sed -re 's|#\s[0-9]+\s"(.*?)".*$$|\1|gi' | \
-		grep -v -e "^/usr/include" -e "^<" -e "^/opt/cuda/include/" | \
+		grep -v -e "^/usr" -e "^<" -e "cuda" | \
 		sort -u | \
 		$(if $(patsubst %.hpp,,$*),,grep -v -e "$*" |) \
 		xargs -n1 realpath --relative-to $(CURDIR) | \
@@ -84,15 +84,17 @@ LDFLAGS = -lm -lmpi
 
 IFLAGS = -I.
 
-CFLAGS ?= --std=c++11 \
+CFLAGS ?= --std=c++14 \
 		-W -Wall -Wextra \
-		-Wno-long-long \
+
+GCCFLAGS = $(CFLAGS) \
 		-Wconversion -Wsign-conversion -Wno-sign-compare \
+		-Wno-long-long \
 		-Winit-self \
 		-Wctor-dtor-privacy -Wnon-virtual-dtor \
 		-Wunreachable-code -fstack-protector \
 
-NVCCFLAGS ?= --std=c++11 -rdc=true\
+NVCCFLAGS ?= --std=c++14 -rdc=true\
 		-Werror cross-execution-space-call \
 		-arch=sm_35 -Wno-deprecated-gpu-targets \
 		-D_FORCE_INLINES -Xcompiler -fPIC \
@@ -119,7 +121,7 @@ $(TARGET_BIN): $(TARGET_OBJECTS) | $(BINDIR)
 
 $(CPP_OBJECTS): $(BUILDDIR)/%: | $(BUILDDIR)
 	@echo $@
-	$(CXX) $(CFLAGS) $(IFLAGS) -c $(patsubst $(BUILDDIR)/%.cpp.o,%.cpp,$(subst __,/,$@)) -o $@
+	$(CXX) $(GCCFLAGS) $(IFLAGS) -c $(patsubst $(BUILDDIR)/%.cpp.o,%.cpp,$(subst __,/,$@)) -o $@
 
 $(CU_OBJECTS): $(BUILDDIR)/%: | $(BUILDDIR)
 	@echo $@

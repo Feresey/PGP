@@ -13,66 +13,61 @@ Exchange::Exchange(const Grid& grid, const Task& task, GPU_pool& pool)
     this->receive_buffer = std::vector<double>(static_cast<size_t>(max_dim * max_dim + 2));
 }
 
-// enum {
-//     LEFT,
-//     RIGHT,
-//     FRONT,
-//     BACK,
-//     TOP,
-//     BOTTOM
-// };
+void Exchange::exchange2D(
+    const int block_idx, const int n_blocks, const int cell_size,
+    const int a_size, const int b_size,
+    const double lower_init, const double upper_init,
+    const side_tag lower, const side_tag upper,
+    std::function<size_t(int my, int a, int b)> get_cell_idx,
+    std::function<int(int)> get_block_idx)
+{
+    const int count = a_size * b_size;
 
-// void Exchange::exchange2D(
-//     const int block_idx, const int n_blocks, const int cell_size,
-//     const int a_size, const int b_size,
-//     const double lower_init, const double upper_init,
-//     const int recvtag_lower, const int recvtag_upper,
-//     std::function<size_t(int my, int a, int b)> get_cell_idx,
-//     std::function<int(int)> get_block_idx)
-// {
-//     const int count = a_size * b_size;
+    MPI_Request req1, req2;
 
-//     MPI_Request req1, req2;
+    for (int each = 0; each <= 1; ++each) {
+        const int copy_cell = (each == 0) ? 0 : (cell_size - 1);
+        const int bound_cell = (each == 0) ? -1 : cell_size;
+        const double init_val = (each == 0) ? lower_init : upper_init;
 
-//     for (int each = 0; each <= 1; ++each) {
-//         const int copy_cell = (each == 0) ? 0 : (cell_size - 1);
-//         const int bound_cell = (each == 0) ? -1 : cell_size;
-//         const double init_val = (each == 0) ? lower_init : upper_init;
+        //@ Является ли текущий блок граничным@
+        const bool is_boundary = block_idx == ((each == 0) ? 0 : (n_blocks - 1));
 
-//         //@ Является ли текущий блок граничным@
-//         const bool is_boundary = block_idx == ((each == 0) ? 0 : (n_blocks - 1));
+        const side_tag tag1 = (each == 0) ? lower : upper;
+        const side_tag tag2 = (each == 0) ? upper : lower;
+        if (!is_boundary) {
+            const int exchange_process_rank = get_block_idx(block_idx + ((each == 0) ? -1 : 1));
 
-//         if (!is_boundary) {
-//             const int tag1 = (each == 0) ? recvtag_lower : recvtag_upper;
-//             const int tag2 = (each == 0) ? recvtag_upper : recvtag_lower;
-//             const int exchange_process_rank = get_block_idx(block_idx + ((each == 0) ? -1 : 1));
+            pool.load_gpu_data(tag1);
 
-//             //@ отсылка и прием нижнего граничного условия@
-//             for (int a = 0; a < a_size; ++a) {
-//                 for (int b = 0; b < b_size; ++b) {
-//                     send_buffer[size_t(a * b_size + b)] = pool.data[get_cell_idx(copy_cell, a, b)];
-//                 }
-//             }
+            //@ отсылка и прием нижнего граничного условия@
+            for (int a = 0; a < a_size; ++a) {
+                for (int b = 0; b < b_size; ++b) {
+                    send_buffer[size_t(a * b_size + b)] = pool.data[get_cell_idx(copy_cell, a, b)];
+                }
+            }
 
-//             // CSC(MPI_Sendrecv(
-//             //     send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag1,
-//             //     receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag2,
-//             //     MPI_COMM_WORLD, MPI_STATUS_IGNORE));
+            // CSC(MPI_Sendrecv(
+            //     send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag1,
+            //     receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag2,
+            //     MPI_COMM_WORLD, MPI_STATUS_IGNORE));
 
-//             MPI_ERR(MPI_Isend(send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag1, MPI_COMM_WORLD, &req1));
-//             MPI_ERR(MPI_Irecv(receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag2, MPI_COMM_WORLD, &req2));
+            MPI_ERR(MPI_Isend(send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag1, MPI_COMM_WORLD, &req1));
+            MPI_ERR(MPI_Irecv(receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag2, MPI_COMM_WORLD, &req2));
 
-//             MPI_ERR(MPI_Wait(&req1, MPI_STATUS_IGNORE));
-//             MPI_ERR(MPI_Wait(&req2, MPI_STATUS_IGNORE));
-//         }
+            MPI_ERR(MPI_Wait(&req1, MPI_STATUS_IGNORE));
+            MPI_ERR(MPI_Wait(&req2, MPI_STATUS_IGNORE));
+        }
 
-//         for (int a = 0; a < a_size; ++a) {
-//             for (int b = 0; b < b_size; ++b) {
-//                 problem.data[get_cell_idx(bound_cell, a, b)] = (is_boundary) ? init_val : receive_buffer[size_t(a * b_size + b)];
-//             }
-//         }
-//     }
-// }
+        for (int a = 0; a < a_size; ++a) {
+            for (int b = 0; b < b_size; ++b) {
+                pool.data[get_cell_idx(bound_cell, a, b)] = (is_boundary) ? init_val : receive_buffer[size_t(a * b_size + b)];
+            }
+        }
+
+        pool.store_gpu_data(tag1);
+    }
+}
 
 void Exchange::boundary_layer_exchange()
 {

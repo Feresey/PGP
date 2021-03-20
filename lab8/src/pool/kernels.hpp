@@ -21,31 +21,30 @@ enum layer_tag {
     FRONT_BACK = FRONT | BACK
 };
 
+dim3_type side_tag_to_dim3_type(side_tag tag);
 dim3_type layer_tag_to_dim3_type(layer_tag tag);
 layer_tag dim3_type_to_layer_tag(dim3_type type);
 
-class DeviceProblem {
-    const BlockGrid& grid;
-    const int n_devices;
+struct DeviceProblem {
+    BlockGrid grid;
+    int kernel_grid_dim, kernel_block_dim;
 
     void get_border(
-        std::vector<double>& out, std::vector<double> data,
+        double* out, double* data,
         int a_szie, int b_size,
         int border_idx, layer_tag tag);
 
     void set_border(
-        std::vector<double>& dest, std::vector<double> data,
+        double* dest, double* data,
         int a_szie, int b_size,
         int border_idx, layer_tag tag);
 
     void set_device(int) const;
 
-public:
-    const int kernel_grid_dim, kernel_block_dim;
-    DeviceProblem(const BlockGrid& grid, const int n_devices, const int kernel_grid_dim = 8, const int kernel_block_dim = 8);
+    void compute(double* out, double* data, mydim3<double> height);
+    double calc_abs_error(double* out, double* data);
 
-    void compute(std::vector<double>& out, std::vector<double>& data, mydim3<double> height);
-    void calc_abs_error(std::vector<double>& out, std::vector<double>& data);
+    DeviceProblem(BlockGrid grid, int kernel_grid_dim = 8, int kernel_block_dim = 8);
 };
 
 #endif
