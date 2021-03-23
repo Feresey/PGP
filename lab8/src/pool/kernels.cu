@@ -170,6 +170,11 @@ void DeviceProblem::compute(double* out, double* data, mydim3<double> height)
             out, data, grid, grid.bsize, height)));
 }
 
+void DeviceProblem::set_device(int device_id) const
+{
+    CUDA_ERR(cudaSetDevice(device_id));
+}
+
 double DeviceProblem::calc_abs_error(double* out, double* data)
 {
     START_KERNEL((

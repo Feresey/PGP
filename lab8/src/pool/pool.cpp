@@ -81,7 +81,7 @@ std::pair<int, int> other_sizes(const BlockGrid& grid, layer_tag tag)
 }
 
 // возвращает является ли border нижней границей для указанной оси.
-bool get_is_lower(layer_tag split_type, side_tag border)
+bool check_is_lower(layer_tag split_type, side_tag border)
 {
     switch (split_type) {
     case LEFT_RIGHT:
@@ -119,7 +119,7 @@ stack_t get_stack_type(layer_tag split_type, side_tag border)
     }
 }
 
-void GPU_pool::stack_data(side_tag border)
+void GPU_pool::stacked_data(side_tag border, bool from_device)
 {
     auto res_dims = other_sizes(grid, split_type);
     stack_t stack_type = get_stack_type(split_type, border);
@@ -131,17 +131,29 @@ void GPU_pool::stack_data(side_tag border)
         Elem& device = devices[device_id];
         std::pair<int, int> sizes = other_sizes(device.grid, split_type);
         const int data_size = sizes.first * sizes.second;
+
+        std::vector<double>& src = (from_device ? device.host_data : data);
+        std::vector<double>& dst = (from_device ? data : device.host_data);
+
         switch (stack_type) {
         case STACK_HORIZONTAL:
+            offset_a = offset_b;
+            // построчное копирование
             for (int read_a = 0; read_a < sizes.first; ++read_a) {
-                for (int read_b = 0; read_b < sizes.first; ++read_b) {
-                    // std::copy(data.begin() + offset_a, data.begin() + offset_a);
-                }
-                offset_b += offset_a + sizes.first;
+                std::copy(
+                    src.begin() + offset_a,
+                    src.begin() + offset_a + sizes.second,
+                    dst.begin());
+                offset_a += res_dims.first;
             }
+            offset_b += sizes.second;
             break;
         case STACK_VERTICAL:
-            std::copy(data.begin() + offset_a, data.begin() + offset_a + data_size, device.host_data.begin());
+            // повезло, повезло
+            std::copy(
+                src.begin() + offset_a,
+                src.begin() + offset_a + data_size,
+                dst.begin());
             offset_a += data_size;
             break;
         }
@@ -152,12 +164,12 @@ void GPU_pool::load_gpu_data(side_tag border)
 {
     // особый случай. Нужная граница принадлежит только одной GPU
     if ((border & split_type) != 0) {
-        bool is_lower = get_is_lower(split_type, border);
+        bool is_lower = check_is_lower(split_type, border);
 
         const size_t one_shot_idx = is_lower ? 0UL : (devices.size() - 1UL);
-        const int layer_idx = is_lower ? 0 : (devices.back().grid.bsize[side_tag_to_dim3_type(border)] - 1);
 
-        auto& device = devices[one_shot_idx];
+        Elem& device = devices[one_shot_idx];
+        device.set_device(int(one_shot_idx));
         int data_size = device.load_border(split_type, border);
 
         std::copy(device.host_data.begin(), device.host_data.begin() + data_size, data.begin());
@@ -172,11 +184,35 @@ void GPU_pool::load_gpu_data(side_tag border)
         device.load_border(split_type, border);
     }
 
-    // TODO stack data
+    this->stacked_data(border, true);
 }
 
-void GPU_pool::store_gpu_data(side_tag tag)
+void GPU_pool::store_gpu_data(side_tag border)
 {
+    // особый случай. Нужная граница принадлежит только одной GPU
+    if ((border & split_type) != 0) {
+        bool is_lower = check_is_lower(split_type, border);
+        const size_t one_shot_idx = is_lower ? 0UL : (devices.size() - 1UL);
+
+        Elem& device = devices[one_shot_idx];
+        std::pair<int, int> sizes = other_sizes(grid, split_type);
+        int data_size = sizes.first * sizes.second;
+
+        std::copy(data.begin(), data.begin() + data_size, device.host_data.begin());
+        device.set_device(int(one_shot_idx));
+        device.store_border(split_type, border);
+
+        return;
+    }
+
+    // Все остальные случаи. Нужная граница находится на нескольких GPU.
+    for (size_t device_id = 0; device_id < devices.size(); ++device_id) {
+        Elem& device = devices[device_id];
+        device.set_device(int(device_id));
+        device.store_border(split_type, border);
+    }
+
+    this->stacked_data(border, false);
 }
 
 double GPU_pool::calc()

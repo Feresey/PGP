@@ -125,29 +125,29 @@ void Exchange::boundary_layer_exchange()
 
 void Exchange::write_result(std::ostream& out)
 {
-    out << std::scientific;
+    // out << std::scientific;
 
-    for (int bk = 0; bk < grid.n_blocks.z; ++bk) {
-        for (int k = 0; k < grid.bsize.z; ++k) {
-            for (int bj = 0; bj < grid.n_blocks.y; ++bj) {
-                for (int j = 0; j < grid.bsize.y; ++j) {
-                    for (int bi = 0; bi < grid.n_blocks.x; ++bi) {
-                        int block_idx = grid.block_absolute_id(bi, bj, bk);
-                        if (bi != 0) {
-                            out << " ";
-                        }
-                        this->write_layer(j, k, block_idx, out);
-                    }
-                    out << std::endl;
-                }
-            }
-            out << std::endl;
-        }
-    }
+    // for (int bk = 0; bk < grid.n_blocks.z; ++bk) {
+    //     for (int k = 0; k < grid.bsize.z; ++k) {
+    //         for (int bj = 0; bj < grid.n_blocks.y; ++bj) {
+    //             for (int j = 0; j < grid.bsize.y; ++j) {
+    //                 for (int bi = 0; bi < grid.n_blocks.x; ++bi) {
+    //                     int block_idx = grid.block_absolute_id(bi, bj, bk);
+    //                     if (bi != 0) {
+    //                         out << " ";
+    //                     }
+    //                     this->write_layer(j, k, block_idx, out);
+    //                 }
+    //                 out << std::endl;
+    //             }
+    //         }
+    //         out << std::endl;
+    //     }
+    // }
 }
 
-// void Exchange::send_result()
-// {
+void Exchange::send_result()
+{
 //     for (int k = 0; k < grid.bsize.z; ++k) {
 //         for (int j = 0; j < grid.bsize.y; ++j) {
 //             for (int i = 0; i < grid.bsize.x; ++i) {
@@ -157,4 +157,4 @@ void Exchange::write_result(std::ostream& out)
 //             MPI_Send(send_buffer.data(), grid.bsize.x, MPI_DOUBLE, ROOT_RANK, tag, MPI_COMM_WORLD);
 //         }
 //     }
-// }
+}

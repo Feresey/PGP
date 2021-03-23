@@ -26,7 +26,7 @@ HEADERS = solver.hpp exchange.hpp helpers.cuh \
 CU_SOURCES  = pool/kernels.cu pool/pool.cu grid/grid.cu
 CPP_SOURCES = main.cpp solver.cpp exchange.cpp \
 		dim3/dim3.cpp \
-		pool/kernels.cpp pool/pool.cpp pool/task.cpp
+		pool/pool.cpp pool/task.cpp
 
 SOURCES = $(CPP_SOURCES)
 
@@ -73,7 +73,7 @@ $(DEPS_LIST): $(DEPS_DIR)/%.mk: | $(DEPS_DIR)
 deps.mk: $(DEPS_LIST) | $(DEPS_DIR)
 	@cat $(sort $(DEPS_LIST)) > $@
 
-# -include deps.mk
+-include deps.mk
 
 CPP_OBJECTS = $(foreach obj,$(CPP_SOURCES),$(BUILDDIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(obj))).o)
 CU_OBJECTS = $(foreach obj,$(CU_SOURCES),$(BUILDDIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(obj))).o)
