@@ -11,7 +11,7 @@ split_by::split_by(int need_split, int n_parts, int min_part_size)
     if (part_size < min_part_size) {
         int n_parts_normalized = need_split / min_part_size;
         // нет смысла делить на 1 целую часть и ещё 1 часть с "хвостиком"
-        if (n_parts_normalized == 1) {
+        if (n_parts_normalized <= 1) {
             this->part_size = need_split;
             this->rest = 0;
             this->n_parts = 1;
@@ -35,7 +35,10 @@ GPU_pool::GPU_pool(const Grid& grid, Task task)
     : split_type(dim3_type_to_layer_tag(grid.bsize.max_dim().get_type()))
     , grid(grid)
     , task(task)
+    , data(grid.cells_per_block())
 {
+    debug("cells per block: %ld", grid.cells_per_block());
+    std::cerr << grid << std::endl;
     int n_devices = this->get_devices();
 
     auto max_elem = grid.bsize.max_dim();
@@ -64,7 +67,9 @@ GPU_pool::GPU_pool(const Grid& grid, Task task)
     this->devices = std::vector<Elem>(size_t(split.n_parts), Elem(BlockGrid { init_dim }, max_rest_dim));
     this->devices.back() = Elem(BlockGrid { rest_dim }, max_rest_dim);
 
+    debug("before init");
     this->init_devices(max_dim);
+    debug("after init");
 }
 
 std::pair<int, int> other_sizes(const BlockGrid& grid, layer_tag tag)
@@ -205,14 +210,14 @@ void GPU_pool::store_gpu_data(side_tag border)
         return;
     }
 
+    this->stacked_data(border, false);
+
     // Все остальные случаи. Нужная граница находится на нескольких GPU.
     for (size_t device_id = 0; device_id < devices.size(); ++device_id) {
         Elem& device = devices[device_id];
         device.set_device(int(device_id));
         device.store_border(split_type, border);
     }
-
-    this->stacked_data(border, false);
 }
 
 double GPU_pool::calc()

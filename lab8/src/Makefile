@@ -92,7 +92,7 @@ GCCFLAGS = $(CFLAGS) \
 		-Wno-long-long \
 		-Winit-self \
 		-Wctor-dtor-privacy -Wnon-virtual-dtor \
-		-Wunreachable-code -fstack-protector \
+		-Wunreachable-code -fstack-protector
 
 NVCCFLAGS ?= --std=c++14 -rdc=true\
 		-Werror cross-execution-space-call \
@@ -101,8 +101,7 @@ NVCCFLAGS ?= --std=c++14 -rdc=true\
 		-Wno-deprecated-declarations
 
 ifeq ($(BENCH),on)
-CFLAGS    = -O3
-NVCCFLAGS += -DBENCHMARK
+CFLAGS    = -O3 -DBENCHMARK
 NVCCFLAGS += -O3
 else
 CFLAGS    += -g3
@@ -120,9 +119,7 @@ $(TARGET_BIN): $(TARGET_OBJECTS) | $(BINDIR)
 	$(NVCC) -ccbin=$(MPICXX) $(NVCCFLAGS) $(IFLAGS) $(LDFLAGS) $^ -o $@
 
 $(CPP_OBJECTS): $(BUILDDIR)/%: | $(BUILDDIR)
-	@echo $@
 	$(CXX) $(GCCFLAGS) $(IFLAGS) -c $(patsubst $(BUILDDIR)/%.cpp.o,%.cpp,$(subst __,/,$@)) -o $@
 
 $(CU_OBJECTS): $(BUILDDIR)/%: | $(BUILDDIR)
-	@echo $@
 	$(NVCC) $(NVCCFLAGS) $(IFLAGS) -c $(patsubst $(BUILDDIR)/%.cu.o,%.cu,$(subst __,/,$@)) -o $@

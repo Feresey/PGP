@@ -13,7 +13,11 @@
         }                                                         \
     } while (false)
 
-#define START_KERNEL(KERNEL) KERNEL; CUDA_ERR(cudaGetLastError())
+#define START_KERNEL(KERNEL) \
+    KERNEL;                  \
+    CUDA_ERR(cudaGetLastError())
+
+#define debug(format, args...) fprintf(stderr, "%s:%d\t" format "\n", __FILE__, __LINE__, ##args)
 
 #ifndef __NVCC__
 #include "dim3/dim3.hpp"
@@ -43,7 +47,7 @@ cudaError_t cudaGetDeviceCount(int*);
 #define cudaMemcpyHostToDevice 1
 
 cudaError_t cudaMemcpy(void*, void*, int, int);
-template<class abuse>
+template <class abuse>
 cudaError_t cudaMalloc(abuse, int);
 cudaError_t cudaFree(void*);
 #endif

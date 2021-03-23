@@ -18,7 +18,6 @@ struct Grid : BlockGrid {
     const int process_rank;
     const int n_processes;
 
-    mydim3<int> bsize;
     mydim3<int> n_blocks;
 
     Grid(int process_rank, int n_processes);

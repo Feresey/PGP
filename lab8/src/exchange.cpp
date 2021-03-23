@@ -24,6 +24,7 @@ void Exchange::exchange2D(
     const int count = a_size * b_size;
 
     MPI_Request req1, req2;
+    debug("pool data size: %ld", pool.data.size());
 
     for (int each = 0; each <= 1; ++each) {
         const int copy_cell = (each == 0) ? 0 : (cell_size - 1);
@@ -61,6 +62,7 @@ void Exchange::exchange2D(
 
         for (int a = 0; a < a_size; ++a) {
             for (int b = 0; b < b_size; ++b) {
+                // debug("write cell idx: %ld", get_cell_idx(bound_cell, a, b));
                 pool.data[get_cell_idx(bound_cell, a, b)] = (is_boundary) ? init_val : receive_buffer[size_t(a * b_size + b)];
             }
         }

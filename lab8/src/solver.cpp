@@ -23,10 +23,12 @@ std::ostream& operator<<(std::ostream& out, const Solver& solver)
 void Solver::solve(GPU_pool& pool, const std::string& output)
 {
     Exchange exchange(grid, task, pool);
+    debug("create exchanger");
 
     MPI_Barrier(MPI_COMM_WORLD);
     double error = 100.0;
     while (error > task.eps) {
+        debug("do iteration");
         exchange.boundary_layer_exchange();
         MPI_Barrier(MPI_COMM_WORLD);
 

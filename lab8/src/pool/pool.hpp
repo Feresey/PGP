@@ -22,8 +22,6 @@ class GPU_pool {
     const mydim3<double> height;
     Task task;
 
-    std::vector<double> buffer;
-
     struct Elem : public DeviceProblem {
         std::vector<double> host_data;
 
@@ -54,7 +52,7 @@ public:
 
     GPU_pool(const Grid& grid, Task task);
 
-    // texcl=true
+    // TODO texcl=true
 
     // загружает данные с GPU в поле data.
     void load_gpu_data(side_tag tag);

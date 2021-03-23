@@ -27,7 +27,7 @@ mydim3<int> BlockGrid::cell_idx(int n) const
 
 size_t BlockGrid::cells_per_block() const
 {
-    return static_cast<size_t>((bsize.x + 2) * (bsize.y + 2) * (bsize.z + 2));
+    return size_t((bsize.x + 2) * (bsize.y + 2) * (bsize.z + 2));
 }
 
 Grid::Grid(int process_rank, int n_processes)
