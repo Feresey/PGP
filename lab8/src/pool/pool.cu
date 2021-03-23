@@ -11,34 +11,50 @@ GPU_pool::Elem::~Elem()
 {
     CUDA_ERR(cudaFree(gpu_data));
     CUDA_ERR(cudaFree(gpu_data_next));
-    CUDA_ERR(cudaFree(gpu_buffer));
 }
 
-std::pair<int, int> other_sizes(const BlockGrid& grid, layer_tag tag)
+int get_layer_idx(const BlockGrid& grid, side_tag border)
 {
-    switch (tag) {
+    switch (border) {
     default:
-    case LEFT_RIGHT:
-        return { grid.bsize.y, grid.bsize.z };
-    case FRONT_BACK:
-        return { grid.bsize.x, grid.bsize.z };
-    case VERTICAL:
-        return { grid.bsize.x, grid.bsize.y };
+    case LEFT:
+    case TOP:
+    case FRONT:
+        return 0;
+    case RIGHT:
+        return grid.bsize.x;
+    case BOTTOM:
+        return grid.bsize.y;
+    case BACK:
+        return grid.bsize.z;
     }
 }
 
-void GPU_pool::Elem::load_border(int layer_idx, layer_tag tag)
+int GPU_pool::Elem::load_border(layer_tag split_type, side_tag border)
 {
-    std::pair<int, int> sizes = other_sizes(grid, tag);
-    this->get_border(gpu_data_next, gpu_data, sizes.first, sizes.second, layer_idx, tag);
-    CUDA_ERR(cudaMemcpy(host_data.data(), gpu_data_next, sizes.first * sizes.second * sizeof(double), cudaMemcpyDeviceToHost));
+    int layer_idx = get_layer_idx(grid, border);
+    std::pair<int, int> sizes = other_sizes(grid, split_type);
+    const int data_size = sizes.first * sizes.second;
+    this->get_border(gpu_data_next, gpu_data, sizes.first, sizes.second, layer_idx, split_type);
+    CUDA_ERR(cudaMemcpy(host_data.data(), gpu_data_next, data_size * sizeof(double), cudaMemcpyDeviceToHost));
+    return data_size;
 }
 
-void GPU_pool::Elem::store_border(int layer_idx, layer_tag tag)
+int GPU_pool::Elem::store_border(layer_tag tag, side_tag border)
 {
+    int layer_idx = get_layer_idx(grid, border);
     std::pair<int, int> sizes = other_sizes(grid, tag);
-    CUDA_ERR(cudaMemcpy(gpu_data_next, host_data.data(), sizes.first * sizes.second * sizeof(double), cudaMemcpyHostToDevice));
+    const int data_size = sizes.first * sizes.second;
+    CUDA_ERR(cudaMemcpy(gpu_data_next, host_data.data(), data_size * sizeof(double), cudaMemcpyHostToDevice));
     this->set_border(gpu_data, gpu_data_next, sizes.first, sizes.second, layer_idx, tag);
+    return data_size;
+}
+
+double GPU_pool::Elem::calculate(mydim3<double> height)
+{
+    this->compute(gpu_data_next, gpu_data, height);
+    std::swap(gpu_data, gpu_data_next);
+    return this->calc_abs_error(gpu_data_next, gpu_data);
 }
 
 int GPU_pool::get_devices() const
@@ -50,11 +66,11 @@ int GPU_pool::get_devices() const
 
 void GPU_pool::init_devices(int max_dim)
 {
+    const dim3_type type = layer_tag_to_dim3_type(split_type);
     std::vector<double> temp(max_dim * max_dim);
 
-    for (auto device_it = devices.begin(); device_it != devices.end(); ++device_it) {
-        Elem& device = *device_it;
-        int device_id = int(std::distance(devices.begin(), device_it));
+    for (size_t device_id = 0; device_id < devices.size(); ++device_id) {
+        Elem& device = devices[device_id];
 
         const uint buffer_size = uint(device.grid.cells_per_block()) * sizeof(double);
 
@@ -62,16 +78,14 @@ void GPU_pool::init_devices(int max_dim)
 
         CUDA_ERR(cudaMalloc(&device.gpu_data, buffer_size));
         CUDA_ERR(cudaMalloc(&device.gpu_data_next, buffer_size));
-        CUDA_ERR(cudaMalloc(&device.gpu_buffer, temp.size() * sizeof(double)));
 
-        for (int k = -1; k <= device.grid.bsize.z; ++k) {
+        for (int i = -1; i <= device.grid.bsize.x; ++i) {
             for (int j = -1; j <= device.grid.bsize.y; ++j) {
-                for (int i = -1; i <= device.grid.bsize.x; ++i) {
+                for (int k = -1; k <= device.grid.bsize.z; ++k) {
                     const mydim3<int> cell = { i, j, k };
-                    const dim3_type type = layer_tag_to_dim3_type(split_type);
 
                     mydim3<int> abused_cell = cell;
-                    abused_cell[type] = cell[type] + device.grid.bsize[type] * device_id;
+                    abused_cell[type] += device.grid.bsize[type] * device_id;
 
                     temp[device.grid.cell_absolute_id(cell)] = buffer[device.grid.cell_absolute_id(abused_cell)];
                 }

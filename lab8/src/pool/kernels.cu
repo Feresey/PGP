@@ -30,21 +30,21 @@ __global__ void get_border_kernel(
 
     double temp;
 
-    for (int b = id_b; b < b_size; b += offset_b) {
-        for (int a = id_a; a < a_size; a += offset_a) {
+    for (int a = id_b; a < a_size; a += offset_a) {
+        for (int b = id_a; b < b_size; b += offset_b) {
             switch (tag) {
             case LEFT_RIGHT:
-                temp = buf[grid.cell_absolute_id(border_idx, a, b)];
+                temp = buf[grid.cell_absolute_id(border_idx, b, a)];
                 break;
             case FRONT_BACK:
-                temp = buf[grid.cell_absolute_id(a, border_idx, b)];
+                temp = buf[grid.cell_absolute_id(b, border_idx, a)];
                 break;
             case VERTICAL:
-                temp = buf[grid.cell_absolute_id(a, b, border_idx)];
+                temp = buf[grid.cell_absolute_id(b, a, border_idx)];
                 break;
             }
 
-            out[b * a_size + a] = temp;
+            out[a * b_size + b] = temp;
         }
     }
 }
@@ -62,21 +62,21 @@ __global__ void set_border_kernel(
 
     int dest_idx;
 
-    for (int b = id_b; b < b_size; b += offset_b) {
-        for (int a = id_a; a < a_size; a += offset_a) {
+    for (int a = id_b; a < a_size; a += offset_a) {
+        for (int b = id_a; b < b_size; b += offset_b) {
             switch (tag) {
             case LEFT_RIGHT:
-                dest_idx = grid.cell_absolute_id(border_idx, a, b);
+                dest_idx = grid.cell_absolute_id(border_idx, b, a);
                 break;
             case FRONT_BACK:
-                dest_idx = grid.cell_absolute_id(a, border_idx, b);
+                dest_idx = grid.cell_absolute_id(b, border_idx, a);
                 break;
             case VERTICAL:
-                dest_idx = grid.cell_absolute_id(a, b, border_idx);
+                dest_idx = grid.cell_absolute_id(b, a, border_idx);
                 break;
             }
 
-            dest[dest_idx] = buf[b * a_size + a];
+            dest[dest_idx] = buf[a * b_size + b];
         }
     }
 }
@@ -190,11 +190,11 @@ dim3_type side_tag_to_dim3_type(side_tag tag)
     case LEFT:
     case RIGHT:
         return DIM3_TYPE_X;
-    case FRONT:
-    case BACK:
-        return DIM3_TYPE_Y;
     case TOP:
     case BOTTOM:
+        return DIM3_TYPE_Y;
+    case FRONT:
+    case BACK:
         return DIM3_TYPE_Z;
     }
 }
@@ -205,9 +205,9 @@ dim3_type layer_tag_to_dim3_type(layer_tag tag)
     default:
     case LEFT_RIGHT:
         return DIM3_TYPE_X;
-    case FRONT_BACK:
-        return DIM3_TYPE_Y;
     case VERTICAL:
+        return DIM3_TYPE_Y;
+    case FRONT_BACK:
         return DIM3_TYPE_Z;
     }
 }
@@ -218,9 +218,9 @@ layer_tag dim3_type_to_layer_tag(dim3_type type)
     default:
     case DIM3_TYPE_X:
         return LEFT_RIGHT;
-    case DIM3_TYPE_Y:
-        return FRONT_BACK;
     case DIM3_TYPE_Z:
+        return FRONT_BACK;
+    case DIM3_TYPE_Y:
         return VERTICAL;
     }
 }

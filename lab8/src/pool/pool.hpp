@@ -12,6 +12,10 @@ struct split_by {
     split_by(int need_split, int n_parts, int min_part_size);
 };
 
+std::pair<int, int> other_sizes(const BlockGrid& grid, layer_tag tag);
+// возвращает является ли border нижней границей для указанной оси.
+bool get_is_lower(layer_tag split_type, side_tag border);
+
 class GPU_pool {
     const layer_tag split_type;
     const Grid& grid;
@@ -25,22 +29,27 @@ class GPU_pool {
 
         double* gpu_data;
         double* gpu_data_next;
-        double* gpu_buffer;
 
-        void load_border(int layer_idx, layer_tag tag);
-        void store_border(int layer_idx, layer_tag tag);
+        int load_border(layer_tag tag, side_tag border);
+        int store_border(layer_tag tag, side_tag border);
         void set_device(int device_id) const;
 
-        double compute(mydim3<double> height);
+        double calculate(mydim3<double> height);
 
         Elem(const BlockGrid& grid, int max_dim);
         ~Elem();
+
+    private:
+        void swap();
     };
 
     std::vector<Elem> devices;
 
     void init_devices(int max_dim);
     int get_devices() const;
+
+    void stack_data(side_tag border);
+    void unstack_data(side_tag border);
 
 public:
     std::vector<double> data;
