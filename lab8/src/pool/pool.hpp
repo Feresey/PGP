@@ -22,6 +22,8 @@ class GPU_pool {
     const mydim3<double> height;
     Task task;
 
+    std::vector<double> buffer;
+
     struct Elem : public DeviceProblem {
         std::vector<double> host_data;
 
@@ -29,23 +31,24 @@ class GPU_pool {
         double* gpu_data_next;
 
         int load_border(layer_tag tag, side_tag border);
+        int load_data();
         int store_border(layer_tag tag, side_tag border);
+        int store_data();
 
         double calculate(mydim3<double> height);
 
-        Elem(const BlockGrid& grid, int max_dim);
+        Elem(const BlockGrid& grid);
+        Elem(Elem&& elem);
         ~Elem();
-
-    private:
-        void swap();
     };
 
     std::vector<Elem> devices;
 
-    void init_devices(int max_dim);
     int get_devices() const;
-
-    void stacked_data(side_tag border, bool from_device);
+    // соединяет и разделяет данные с нескольких GPU
+    void stacked_borders(side_tag border, bool from_device);
+    // void stacked_border(side_tag border)
+    void move_gpu_data(bool to_device);
 
 public:
     std::vector<double> data;
@@ -55,9 +58,12 @@ public:
     // TODO texcl=true
 
     // загружает данные с GPU в поле data.
-    void load_gpu_data(side_tag tag);
+    void load_gpu_border(side_tag border);
     // загружает данные на GPU из поля data.
-    void store_gpu_data(side_tag tag);
+    void store_gpu_border(side_tag border);
+
+    // выгружает все данные с GPU.
+    void load_gpu_data();
 
     // выполняет вычисления
     double calc();

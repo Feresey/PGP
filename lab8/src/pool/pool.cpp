@@ -35,7 +35,8 @@ GPU_pool::GPU_pool(const Grid& grid, Task task)
     : split_type(dim3_type_to_layer_tag(grid.bsize.max_dim().get_type()))
     , grid(grid)
     , task(task)
-    , data(grid.cells_per_block())
+    , buffer(grid.cells_per_block())
+    , data(grid.cells_per_block(), task.u_0)
 {
     debug("cells per block: %ld", grid.cells_per_block());
     std::cerr << grid << std::endl;
@@ -51,24 +52,29 @@ GPU_pool::GPU_pool(const Grid& grid, Task task)
     mydim3<int> rest_dim;
     // итератор по координатам x, y, z
     for (auto elem = grid.bsize.begin(); elem != grid.bsize.end(); ++elem) {
-        dim3_type offset = elem.get_type();
         // координата, по которой разделение
+        dim3_type type = elem.get_type();
         if (elem == max_elem) {
-            init_dim[offset] = split.part_size;
-            rest_dim[offset] = split.part_size + split.rest;
+            init_dim[type] = split.part_size;
+            rest_dim[type] = split.part_size + split.rest;
         } else {
-            init_dim[offset] = *elem;
-            rest_dim[offset] = *elem;
+            init_dim[type] = *elem;
+            rest_dim[type] = *elem;
         }
     }
 
-    int max_rest_dim = *rest_dim.max_dim();
-
-    this->devices = std::vector<Elem>(size_t(split.n_parts), Elem(BlockGrid { init_dim }, max_rest_dim));
-    this->devices.back() = Elem(BlockGrid { rest_dim }, max_rest_dim);
+    debug("devices head");
+    for (size_t device_id = 0; device_id < split.n_parts; ++device_id) {
+        devices.push_back(Elem(BlockGrid { init_dim }));
+        debug("fuck");
+    }
+    if (split.rest != 0) {
+        debug("devices tail");
+        this->devices.push_back(Elem(BlockGrid { rest_dim }));
+    }
 
     debug("before init");
-    this->init_devices(max_dim);
+    this->move_gpu_data(true);
     debug("after init");
 }
 
@@ -124,48 +130,16 @@ stack_t get_stack_type(layer_tag split_type, side_tag border)
     }
 }
 
-void GPU_pool::stacked_data(side_tag border, bool from_device)
+void GPU_pool::stacked_borders(side_tag border, bool from_device)
 {
-    auto res_dims = other_sizes(grid, split_type);
-    stack_t stack_type = get_stack_type(split_type, border);
-
-    int offset_a = 0;
-    int offset_b = 0;
-
     for (size_t device_id = 0; device_id < devices.size(); ++device_id) {
         Elem& device = devices[device_id];
-        std::pair<int, int> sizes = other_sizes(device.grid, split_type);
-        const int data_size = sizes.first * sizes.second;
-
-        std::vector<double>& src = (from_device ? device.host_data : data);
-        std::vector<double>& dst = (from_device ? data : device.host_data);
-
-        switch (stack_type) {
-        case STACK_HORIZONTAL:
-            offset_a = offset_b;
-            // построчное копирование
-            for (int read_a = 0; read_a < sizes.first; ++read_a) {
-                std::copy(
-                    src.begin() + offset_a,
-                    src.begin() + offset_a + sizes.second,
-                    dst.begin());
-                offset_a += res_dims.first;
-            }
-            offset_b += sizes.second;
-            break;
-        case STACK_VERTICAL:
-            // повезло, повезло
-            std::copy(
-                src.begin() + offset_a,
-                src.begin() + offset_a + data_size,
-                dst.begin());
-            offset_a += data_size;
-            break;
-        }
+        device.set_device(int(device_id));
+        
     }
 }
 
-void GPU_pool::load_gpu_data(side_tag border)
+void GPU_pool::load_gpu_border(side_tag border)
 {
     // особый случай. Нужная граница принадлежит только одной GPU
     if ((border & split_type) != 0) {
@@ -189,11 +163,12 @@ void GPU_pool::load_gpu_data(side_tag border)
         device.load_border(split_type, border);
     }
 
-    this->stacked_data(border, true);
+    this->stacked_borders(border, true);
 }
 
-void GPU_pool::store_gpu_data(side_tag border)
+void GPU_pool::store_gpu_border(side_tag border)
 {
+    debug("store border %d", border);
     // особый случай. Нужная граница принадлежит только одной GPU
     if ((border & split_type) != 0) {
         bool is_lower = check_is_lower(split_type, border);
@@ -203,6 +178,16 @@ void GPU_pool::store_gpu_data(side_tag border)
         std::pair<int, int> sizes = other_sizes(grid, split_type);
         int data_size = sizes.first * sizes.second;
 
+        debug("on host");
+        for (int i = 0; i < sizes.first; ++i) {
+            for (int j = 0; j < sizes.second; ++j) {
+                std::cerr << data[i * sizes.second + j] << " ";
+            }
+            std::cerr << std::endl;
+        }
+        std::cerr << std::endl;
+        debug("on host end");
+
         std::copy(data.begin(), data.begin() + data_size, device.host_data.begin());
         device.set_device(int(one_shot_idx));
         device.store_border(split_type, border);
@@ -210,7 +195,8 @@ void GPU_pool::store_gpu_data(side_tag border)
         return;
     }
 
-    this->stacked_data(border, false);
+    debug("stack data");
+    this->stacked_borders(border, false);
 
     // Все остальные случаи. Нужная граница находится на нескольких GPU.
     for (size_t device_id = 0; device_id < devices.size(); ++device_id) {
@@ -233,3 +219,5 @@ double GPU_pool::calc()
     }
     return all_error;
 }
+
+void GPU_pool::load_gpu_data() { this->move_gpu_data(false); }

@@ -8,7 +8,6 @@
 #include "grid/grid.hpp"
 #include "helpers.cuh"
 #include "kernels.hpp"
-#include "myvector/vector.cuh"
 
 #define BORDER_GRID_DIM 32
 #define BORDER_BLOCK_DIM 32

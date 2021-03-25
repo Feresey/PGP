@@ -17,7 +17,11 @@
     KERNEL;                  \
     CUDA_ERR(cudaGetLastError())
 
-#define debug(format, args...) fprintf(stderr, "%s:%d\t" format "\n", __FILE__, __LINE__, ##args)
+#define debug(format, args...)                                              \
+    do {                                                                    \
+        fprintf(stderr, "%s:%d\t" format "\n", __FILE__, __LINE__, ##args); \
+        fflush(stderr);                                                     \
+    } while (false)
 
 #ifndef __NVCC__
 #include "dim3/dim3.hpp"

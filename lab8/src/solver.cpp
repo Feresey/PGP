@@ -32,8 +32,13 @@ void Solver::solve(GPU_pool& pool, const std::string& output)
         exchange.boundary_layer_exchange();
         MPI_Barrier(MPI_COMM_WORLD);
 
+        debug("before calc");
+        pool.load_gpu_data();
+        exchange.write_result(std::cerr);
         double local_error = pool.calc();
-        // exchange.write_result(std::cerr);
+        debug("after calc");
+        pool.load_gpu_data();
+        exchange.write_result(std::cerr);
         error = this->calc_error(local_error);
     }
     MPI_Barrier(MPI_COMM_WORLD);

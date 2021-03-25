@@ -23,7 +23,7 @@ void Exchange::exchange2D(
 {
     const int count = a_size * b_size;
 
-    MPI_Request req1, req2;
+    MPI_Request requests[2];
     debug("pool data size: %ld", pool.data.size());
 
     for (int each = 0; each <= 1; ++each) {
@@ -39,7 +39,7 @@ void Exchange::exchange2D(
         if (!is_boundary) {
             const int exchange_process_rank = get_block_idx(block_idx + ((each == 0) ? -1 : 1));
 
-            pool.load_gpu_data(tag1);
+            pool.load_gpu_border(tag1);
 
             //@ отсылка и прием нижнего граничного условия@
             for (int a = 0; a < a_size; ++a) {
@@ -53,21 +53,26 @@ void Exchange::exchange2D(
             //     receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag2,
             //     MPI_COMM_WORLD, MPI_STATUS_IGNORE));
 
-            MPI_ERR(MPI_Isend(send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag1, MPI_COMM_WORLD, &req1));
-            MPI_ERR(MPI_Irecv(receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag2, MPI_COMM_WORLD, &req2));
+            MPI_ERR(MPI_Isend(send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag1, MPI_COMM_WORLD, &requests[0]));
+            MPI_ERR(MPI_Irecv(receive_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag2, MPI_COMM_WORLD, &requests[1]));
 
-            MPI_ERR(MPI_Wait(&req1, MPI_STATUS_IGNORE));
-            MPI_ERR(MPI_Wait(&req2, MPI_STATUS_IGNORE));
+            MPI_ERR(MPI_Waitall(2, requests, MPI_STATUSES_IGNORE));
         }
 
+        debug("mpi data begin");
         for (int a = 0; a < a_size; ++a) {
             for (int b = 0; b < b_size; ++b) {
+                size_t idx = size_t(a * b_size + b);
                 // debug("write cell idx: %ld", get_cell_idx(bound_cell, a, b));
-                pool.data[get_cell_idx(bound_cell, a, b)] = (is_boundary) ? init_val : receive_buffer[size_t(a * b_size + b)];
+                pool.data[idx] = (is_boundary) ? init_val : receive_buffer[idx];
+                std::cerr << pool.data[idx] << " ";
             }
+            std::cerr << std::endl;
         }
+        std::cerr << std::endl;
+        debug("mpi data end");
 
-        pool.store_gpu_data(tag1);
+        pool.store_gpu_border(tag1);
     }
 }
 
@@ -106,57 +111,59 @@ void Exchange::boundary_layer_exchange()
         });
 }
 
-// void Exchange::write_layer(int j, int k, int block_idx, std::ostream& out)
-// {
-//     if (block_idx == 0) {
-//         for (int i = 0; i < grid.bsize.x; ++i) {
-//             receive_buffer[size_t(i)] = problem.data[grid.cell_absolute_id(i, j, k)];
-//         }
-//     } else {
-//         int tag = k * grid.bsize.z + j;
-//         MPI_ERR(MPI_Recv(receive_buffer.data(), grid.bsize.x, MPI_DOUBLE, block_idx, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
-//     }
+void Exchange::write_layer(int j, int k, int block_idx, std::ostream& out)
+{
+    if (block_idx == 0) {
+        pool.load_gpu_data();
+        for (int i = 0; i < grid.bsize.x; ++i) {
+            receive_buffer[size_t(i)] = pool.data[grid.cell_absolute_id(i, j, k)];
+        }
+    } else {
+        int tag = k * grid.bsize.z + j;
+        MPI_ERR(MPI_Recv(receive_buffer.data(), grid.bsize.x, MPI_DOUBLE, block_idx, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
+    }
 
-//     for (int i = 0; i < grid.bsize.x; ++i) {
-//         if (i != 0) {
-//             out << " ";
-//         }
-//         out << receive_buffer[size_t(i)];
-//     }
-// }
+    for (int i = 0; i < grid.bsize.x; ++i) {
+        if (i != 0) {
+            out << " ";
+        }
+        out << receive_buffer[size_t(i)];
+    }
+}
 
 void Exchange::write_result(std::ostream& out)
 {
-    // out << std::scientific;
+    out << std::scientific;
 
-    // for (int bk = 0; bk < grid.n_blocks.z; ++bk) {
-    //     for (int k = 0; k < grid.bsize.z; ++k) {
-    //         for (int bj = 0; bj < grid.n_blocks.y; ++bj) {
-    //             for (int j = 0; j < grid.bsize.y; ++j) {
-    //                 for (int bi = 0; bi < grid.n_blocks.x; ++bi) {
-    //                     int block_idx = grid.block_absolute_id(bi, bj, bk);
-    //                     if (bi != 0) {
-    //                         out << " ";
-    //                     }
-    //                     this->write_layer(j, k, block_idx, out);
-    //                 }
-    //                 out << std::endl;
-    //             }
-    //         }
-    //         out << std::endl;
-    //     }
-    // }
+    for (int bk = 0; bk < grid.n_blocks.z; ++bk) {
+        for (int k = 0; k < grid.bsize.z; ++k) {
+            for (int bj = 0; bj < grid.n_blocks.y; ++bj) {
+                for (int j = 0; j < grid.bsize.y; ++j) {
+                    for (int bi = 0; bi < grid.n_blocks.x; ++bi) {
+                        int block_idx = grid.block_absolute_id(bi, bj, bk);
+                        if (bi != 0) {
+                            out << " ";
+                        }
+                        this->write_layer(j, k, block_idx, out);
+                    }
+                    out << std::endl;
+                }
+            }
+            out << std::endl;
+        }
+    }
 }
 
 void Exchange::send_result()
 {
-//     for (int k = 0; k < grid.bsize.z; ++k) {
-//         for (int j = 0; j < grid.bsize.y; ++j) {
-//             for (int i = 0; i < grid.bsize.x; ++i) {
-//                 send_buffer[size_t(i)] = problem.data[grid.cell_absolute_id(i, j, k)];
-//             }
-//             int tag = k * grid.bsize.z + j;
-//             MPI_Send(send_buffer.data(), grid.bsize.x, MPI_DOUBLE, ROOT_RANK, tag, MPI_COMM_WORLD);
-//         }
-//     }
+    pool.load_gpu_data();
+    for (int i = 0; i < grid.bsize.z; ++i) {
+        for (int j = 0; j < grid.bsize.y; ++j) {
+            for (int k = 0; k < grid.bsize.x; ++k) {
+                send_buffer[size_t(k)] = pool.data[grid.cell_absolute_id(i, j, k)];
+            }
+            int tag = i * grid.bsize.z + j;
+            MPI_Send(send_buffer.data(), grid.bsize.x, MPI_DOUBLE, ROOT_RANK, tag, MPI_COMM_WORLD);
+        }
+    }
 }

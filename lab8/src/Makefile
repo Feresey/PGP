@@ -20,8 +20,7 @@ $(DEPS_DIR) $(BUILDDIR) $(BINDIR):
 
 HEADERS = solver.hpp exchange.hpp helpers.cuh \
 		grid/grid.hpp dim3/dim3.hpp \
-		pool/pool.hpp pool/task.hpp pool/kernels.hpp \
-		myvector/vector.cuh
+		pool/pool.hpp pool/task.hpp pool/kernels.hpp
 
 CU_SOURCES  = pool/kernels.cu pool/pool.cu grid/grid.cu
 CPP_SOURCES = main.cpp solver.cpp exchange.cpp \
