@@ -28,7 +28,7 @@ void Solver::solve(GPU_pool& pool, const std::string& output)
     MPI_Barrier(MPI_COMM_WORLD);
     double error = 100.0;
     while (error > task.eps) {
-        debug("do iteration");
+        // debug("do iteration");
         exchange.boundary_layer_exchange();
         MPI_Barrier(MPI_COMM_WORLD);
 
@@ -36,10 +36,12 @@ void Solver::solve(GPU_pool& pool, const std::string& output)
         pool.load_gpu_data();
         exchange.write_result(std::cerr);
         double local_error = pool.calc();
-        debug("after calc");
+        debug("after calc, error = %e", local_error);
         pool.load_gpu_data();
         exchange.write_result(std::cerr);
         error = this->calc_error(local_error);
+
+        // MPI_Abort(MPI_COMM_WORLD, MPI_ERR_ASSERT);
     }
     MPI_Barrier(MPI_COMM_WORLD);
 

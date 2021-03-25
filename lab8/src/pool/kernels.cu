@@ -162,25 +162,17 @@ void DeviceProblem::set_border(
         border_idx, tag)));
 }
 
-void DeviceProblem::compute(double* out, double* data, mydim3<double> height)
+double DeviceProblem::compute(double* out, double* data, mydim3<double> height)
 {
     START_KERNEL((
         compute_kernel<<<BORDER_DIMS_3D(kernel_block_dim, kernel_grid_dim)>>>(
             out, data, grid, grid.bsize, height)));
-}
 
-void DeviceProblem::set_device(int device_id) const
-{
-    CUDA_ERR(cudaSetDevice(device_id));
-}
-
-double DeviceProblem::calc_abs_error(double* out, double* data)
-{
     START_KERNEL((
         abs_error_kernel<<<BORDER_DIMS_3D(kernel_block_dim, kernel_grid_dim)>>>(
-            out, data, grid, grid.bsize)));
+            data, out, grid, grid.bsize)));
 
-    thrust::device_ptr<double> dev_ptr = thrust::device_pointer_cast(out);
+    thrust::device_ptr<double> dev_ptr = thrust::device_pointer_cast(data);
     double error = *thrust::max_element(dev_ptr, dev_ptr + grid.cells_per_block());
 
     CUDA_ERR(cudaGetLastError());
@@ -226,5 +218,21 @@ layer_tag dim3_type_to_layer_tag(dim3_type type)
         return FRONT_BACK;
     case DIM3_TYPE_Y:
         return VERTICAL;
+    }
+}
+
+layer_tag side_tag_to_layer_tag(side_tag tag)
+{
+    switch (tag) {
+    default:
+    case LEFT:
+    case RIGHT:
+        return LEFT_RIGHT;
+    case TOP:
+    case BOTTOM:
+        return VERTICAL;
+    case FRONT:
+    case BACK:
+        return FRONT_BACK;
     }
 }

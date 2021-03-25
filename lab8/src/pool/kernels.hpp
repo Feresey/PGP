@@ -24,11 +24,13 @@ enum layer_tag {
 dim3_type side_tag_to_dim3_type(side_tag tag);
 dim3_type layer_tag_to_dim3_type(layer_tag tag);
 layer_tag dim3_type_to_layer_tag(dim3_type type);
+layer_tag side_tag_to_layer_tag(side_tag tag);
 
-struct DeviceProblem {
+class DeviceProblem {
     BlockGrid grid;
     int kernel_grid_dim, kernel_block_dim;
 
+protected:
     void get_border(
         double* out, double* data,
         int a_szie, int b_size,
@@ -39,11 +41,9 @@ struct DeviceProblem {
         int a_szie, int b_size,
         int border_idx, layer_tag tag);
 
-    void set_device(int) const;
+    double compute(double* out, double* data, mydim3<double> height);
 
-    void compute(double* out, double* data, mydim3<double> height);
-    double calc_abs_error(double* out, double* data);
-
+public:
     DeviceProblem(BlockGrid grid, int kernel_grid_dim = 8, int kernel_block_dim = 8);
 };
 

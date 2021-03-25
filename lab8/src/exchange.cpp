@@ -24,11 +24,9 @@ void Exchange::exchange2D(
     const int count = a_size * b_size;
 
     MPI_Request requests[2];
-    debug("pool data size: %ld", pool.data.size());
 
     for (int each = 0; each <= 1; ++each) {
         const int copy_cell = (each == 0) ? 0 : (cell_size - 1);
-        const int bound_cell = (each == 0) ? -1 : cell_size;
         const double init_val = (each == 0) ? lower_init : upper_init;
 
         //@ Является ли текущий блок граничным@
@@ -59,18 +57,17 @@ void Exchange::exchange2D(
             MPI_ERR(MPI_Waitall(2, requests, MPI_STATUSES_IGNORE));
         }
 
-        debug("mpi data begin");
         for (int a = 0; a < a_size; ++a) {
             for (int b = 0; b < b_size; ++b) {
-                size_t idx = size_t(a * b_size + b);
+                size_t idx = a * b_size + b;
                 // debug("write cell idx: %ld", get_cell_idx(bound_cell, a, b));
                 pool.data[idx] = (is_boundary) ? init_val : receive_buffer[idx];
-                std::cerr << pool.data[idx] << " ";
+                // std::cerr << pool.data[idx] << " ";
             }
-            std::cerr << std::endl;
+            // std::cerr << std::endl;
         }
-        std::cerr << std::endl;
-        debug("mpi data end");
+        // std::cerr << std::endl;
+        // debug("mpi data end");
 
         pool.store_gpu_border(tag1);
     }
