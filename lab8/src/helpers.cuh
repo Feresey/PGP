@@ -2,6 +2,7 @@
 #define HELPERS_CUH
 
 #include <cstdio>
+#include <ctime>
 
 #define CUDA_ERR(k)                                               \
     do {                                                          \
@@ -17,10 +18,13 @@
     KERNEL;                  \
     CUDA_ERR(cudaGetLastError())
 
-#define debug(format, args...)                                              \
-    do {                                                                    \
-        fprintf(stderr, "%s:%d\t" format "\n", __FILE__, __LINE__, ##args); \
-        fflush(stderr);                                                     \
+static const clock_t start_time = clock();
+
+#define debug(format, args...)                                                                                                       \
+    do {                                                                                                                             \
+        clock_t curr_time = clock();                                                                                                 \
+        fprintf(stderr, "%9.3f %s:%d\t" format "\n", (double)(curr_time - start_time) / CLOCKS_PER_SEC, __FILE__, __LINE__, ##args); \
+        fflush(stderr);                                                                                                              \
     } while (false)
 
 #ifndef __NVCC__

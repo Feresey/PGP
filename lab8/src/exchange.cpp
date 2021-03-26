@@ -52,7 +52,7 @@ void Exchange::exchange2D(dim3_type block_coord)
     //         b_size = *elem;
     //     }
     // }
-    debug("sizes (%d,%d)", a_size, b_size);
+    // debug("sizes (%d,%d)", a_size, b_size);
 
     const int count = a_size * b_size;
     const mydim3<int> block_absolute_idx = grid.block_idx();
@@ -61,7 +61,6 @@ void Exchange::exchange2D(dim3_type block_coord)
     MPI_Request requests[2];
 
     for (int each = 0; each <= 1; ++each) {
-        const int copy_cell = (each == 0) ? 0 : (grid.bsize[block_coord] - 1);
         const double init_val = (each == 0) ? lower_init : upper_init;
 
         //@ Является ли текущий блок граничным@
