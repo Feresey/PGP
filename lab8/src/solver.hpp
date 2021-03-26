@@ -20,7 +20,7 @@ class Solver {
 
 public:
     Solver(const Grid& grid, const Task& task);
-    void solve(GPU_pool& pool, const std::string& output);
+    void solve(Device& pool, const std::string& output);
 };
 
 #endif

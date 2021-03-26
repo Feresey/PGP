@@ -1,7 +1,7 @@
 #include "exchange.hpp"
 #include "helpers.hpp"
 
-Exchange::Exchange(const Grid& grid, const Task& task, GPU_pool& pool)
+Exchange::Exchange(const Grid& grid, const Task& task, Device& pool)
     : grid(grid)
     , task(task)
     , pool(pool)
@@ -13,38 +13,80 @@ Exchange::Exchange(const Grid& grid, const Task& task, GPU_pool& pool)
     this->receive_buffer = std::vector<double>(static_cast<size_t>(max_dim * max_dim + 2));
 }
 
-void Exchange::exchange2D(
-    const int block_idx, const int n_blocks, const int cell_size,
-    const int a_size, const int b_size,
-    const double lower_init, const double upper_init,
-    const side_tag lower, const side_tag upper,
-    std::function<size_t(int my, int a, int b)> get_cell_idx,
-    std::function<int(int)> get_block_idx)
+void Exchange::exchange2D(dim3_type block_coord)
 {
+    double lower_init, upper_init;
+    side_tag lower_tag, upper_tag;
+
+    switch (block_coord) {
+    default:
+    case DIM3_TYPE_X:
+        lower_tag = LEFT;
+        lower_init = task.u_left;
+        upper_tag = RIGHT;
+        upper_init = task.u_right;
+        break;
+    case DIM3_TYPE_Y:
+        lower_tag = FRONT;
+        lower_init = task.u_front;
+        upper_tag = BACK;
+        upper_init = task.u_back;
+        break;
+    case DIM3_TYPE_Z:
+        lower_tag = BOTTOM;
+        lower_init = task.u_bottom;
+        upper_tag = TOP;
+        upper_init = task.u_top;
+        break;
+    }
+
+    int a_size = -1, b_size = -1;
+    for (auto elem = grid.bsize.begin(); elem != grid.bsize.end(); ++elem) {
+        if (elem.get_type() == block_coord) {
+            continue;
+        }
+        if (a_size == -1) {
+            a_size = *elem;
+        } else {
+            b_size = *elem;
+        }
+    }
+
     const int count = a_size * b_size;
+    const mydim3<int> block_absolute_idx = grid.block_idx();
+    const int block_idx = block_absolute_idx[block_coord];
 
     MPI_Request requests[2];
 
     for (int each = 0; each <= 1; ++each) {
-        const int copy_cell = (each == 0) ? 0 : (cell_size - 1);
+        const int copy_cell = (each == 0) ? 0 : (grid.bsize[block_coord] - 1);
         const double init_val = (each == 0) ? lower_init : upper_init;
 
         //@ Является ли текущий блок граничным@
-        const bool is_boundary = block_idx == ((each == 0) ? 0 : (n_blocks - 1));
+        const bool is_boundary = block_idx == ((each == 0) ? 0 : (grid.n_blocks[block_coord] - 1));
 
-        const side_tag tag1 = (each == 0) ? lower : upper;
-        const side_tag tag2 = (each == 0) ? upper : lower;
+        const side_tag tag1 = (each == 0) ? lower_tag : upper_tag;
+        const side_tag tag2 = (each == 0) ? upper_tag : lower_tag;
         if (!is_boundary) {
-            const int exchange_process_rank = get_block_idx(block_idx + ((each == 0) ? -1 : 1));
-
+            mydim3<int> exchange_block = block_absolute_idx;
+            exchange_block[block_coord] = block_idx + ((each == 0) ? -1 : 1);
+            const int exchange_process_rank = grid.block_absolute_id(exchange_block);
+            debug("load border %d", tag1);
             pool.load_gpu_border(tag1);
 
             //@ отсылка и прием нижнего граничного условия@
             for (int a = 0; a < a_size; ++a) {
                 for (int b = 0; b < b_size; ++b) {
-                    send_buffer[size_t(a * b_size + b)] = pool.data[get_cell_idx(copy_cell, a, b)];
+                    size_t idx = size_t(a * b_size + b);
+                    send_buffer[idx] = pool.data[idx];
+                    std::cerr << pool.data[idx] << " ";
                 }
+                std::cerr << std::endl;
             }
+            std::cerr << std::endl;
+
+            debug("show all data");
+            pool.show(std::cerr);
 
             // CSC(MPI_Sendrecv(
             //     send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag1,
@@ -59,15 +101,10 @@ void Exchange::exchange2D(
 
         for (int a = 0; a < a_size; ++a) {
             for (int b = 0; b < b_size; ++b) {
-                size_t idx = a * b_size + b;
-                // debug("write cell idx: %ld", get_cell_idx(bound_cell, a, b));
+                size_t idx = size_t(a * b_size + b);
                 pool.data[idx] = (is_boundary) ? init_val : receive_buffer[idx];
-                // std::cerr << pool.data[idx] << " ";
             }
-            // std::cerr << std::endl;
         }
-        // std::cerr << std::endl;
-        // debug("mpi data end");
 
         pool.store_gpu_border(tag1);
     }
@@ -75,37 +112,9 @@ void Exchange::exchange2D(
 
 void Exchange::boundary_layer_exchange()
 {
-    const mydim3<int> block_idx = grid.block_idx();
-
-    exchange2D(
-        block_idx.x, grid.n_blocks.x, grid.bsize.x,
-        grid.bsize.y, grid.bsize.z,
-        task.u_left, task.u_right,
-        LEFT, RIGHT,
-        [this](int my, int a, int b) { return grid.cell_absolute_id(my, a, b); },
-        [this, block_idx](int my) {
-            return grid.block_absolute_id(my, block_idx.y, block_idx.z);
-        });
-
-    exchange2D(
-        block_idx.y, grid.n_blocks.y, grid.bsize.y,
-        grid.bsize.x, grid.bsize.z,
-        task.u_front, task.u_back,
-        FRONT, BACK,
-        [this](int my, int a, int b) { return grid.cell_absolute_id(a, my, b); },
-        [this, block_idx](int my) {
-            return grid.block_absolute_id(block_idx.x, my, block_idx.z);
-        });
-
-    exchange2D(
-        block_idx.z, grid.n_blocks.z, grid.bsize.z,
-        grid.bsize.x, grid.bsize.y,
-        task.u_bottom, task.u_top,
-        BOTTOM, TOP,
-        [this](int my, int a, int b) { return grid.cell_absolute_id(a, b, my); },
-        [this, block_idx](int my) {
-            return grid.block_absolute_id(block_idx.x, block_idx.y, my);
-        });
+    exchange2D(DIM3_TYPE_X);
+    exchange2D(DIM3_TYPE_Y);
+    exchange2D(DIM3_TYPE_Z);
 }
 
 void Exchange::write_layer(int j, int k, int block_idx, std::ostream& out)
@@ -130,6 +139,10 @@ void Exchange::write_layer(int j, int k, int block_idx, std::ostream& out)
 
 void Exchange::write_result(std::ostream& out)
 {
+    if (grid.process_rank != ROOT_RANK) {
+        send_result();
+        return;
+    }
     out << std::scientific;
 
     for (int bk = 0; bk < grid.n_blocks.z; ++bk) {

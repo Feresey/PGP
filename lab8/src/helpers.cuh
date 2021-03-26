@@ -47,6 +47,8 @@ char* cudaGetErrorString(cudaError_t);
 cudaError_t cudaSetDevice(int);
 cudaError_t cudaGetDeviceCount(int*);
 
+void __syncthreads();
+
 #define cudaMemcpyDeviceToHost 0
 #define cudaMemcpyHostToDevice 1
 

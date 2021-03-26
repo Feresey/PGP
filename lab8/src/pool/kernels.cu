@@ -83,7 +83,6 @@ __global__ void set_border_kernel(
 __global__ void compute_kernel(
     double* out, double* data,
     BlockGrid grid,
-    mydim3<int> bsize,
     mydim3<double> h)
 {
     const int id_x = threadIdx.x + blockIdx.x * blockDim.x,
@@ -97,9 +96,9 @@ __global__ void compute_kernel(
                  inv_hy = 1.0 / (h.y * h.y),
                  inv_hz = 1.0 / (h.z * h.z);
 
-    for (int i = id_x; i < bsize.x; i += offset_x) {
-        for (int j = id_y; j < bsize.y; j += offset_y) {
-            for (int k = id_z; k < bsize.z; k += offset_z) {
+    for (int i = id_x; i < grid.bsize.x; i += offset_x) {
+        for (int j = id_y; j < grid.bsize.y; j += offset_y) {
+            for (int k = id_z; k < grid.bsize.z; k += offset_z) {
                 double num = 0.0
                     + (data[grid.cell_absolute_id(i + 1, j, k)] + data[grid.cell_absolute_id(i - 1, j, k)]) * inv_hx
                     + (data[grid.cell_absolute_id(i, j + 1, k)] + data[grid.cell_absolute_id(i, j - 1, k)]) * inv_hy
@@ -112,20 +111,25 @@ __global__ void compute_kernel(
     }
 }
 
-__global__ void abs_error_kernel(double* out, double* data, BlockGrid grid, mydim3<int> bsize)
+__global__ void abs_error_kernel(double* out, double* data, BlockGrid grid)
 {
-    const int id_x = threadIdx.x + blockIdx.x * blockDim.x,
-              id_y = threadIdx.y + blockIdx.y * blockDim.y,
-              id_z = threadIdx.z + blockIdx.z * blockDim.z,
+    const int idx = threadIdx.x + blockIdx.x * blockDim.x,
+              idy = threadIdx.y + blockIdx.y * blockDim.y,
+              idz = threadIdx.z + blockIdx.z * blockDim.z,
               offset_x = blockDim.x * gridDim.x,
               offset_y = blockDim.y * gridDim.y,
               offset_z = blockDim.z * gridDim.z;
 
-    for (int i = id_x - 1; i <= bsize.x; i += offset_x) {
-        for (int j = id_y - 1; j <= bsize.y; j += offset_y) {
-            for (int k = id_z - 1; k <= bsize.z; k += offset_z) {
+    for (int i = idx - 1; i <= grid.bsize.x; i += offset_x) {
+        for (int j = idy - 1; j <= grid.bsize.y; j += offset_y) {
+            for (int k = idz - 1; k <= grid.bsize.z; k += offset_z) {
                 int cell_id = grid.cell_absolute_id(i, j, k);
-                out[cell_id] = fabsf(out[cell_id] - data[cell_id]);
+                if ((i | j | k) == -1
+                    || i == grid.bsize.x || j == grid.bsize.y || k == grid.bsize.z) {
+                    out[cell_id] = 0.0;
+                } else {
+                    out[cell_id] = fabsf(out[cell_id] - data[cell_id]);
+                }
             }
         }
     }
@@ -133,14 +137,14 @@ __global__ void abs_error_kernel(double* out, double* data, BlockGrid grid, mydi
 
 /* CXX API */
 
-DeviceProblem::DeviceProblem(BlockGrid grid, int kernel_grid_dim, int kernel_block_dim)
+DeviceKernels::DeviceKernels(BlockGrid grid, int kernel_grid_dim, int kernel_block_dim)
     : grid(grid)
     , kernel_grid_dim(kernel_grid_dim)
     , kernel_block_dim(kernel_block_dim)
 {
 }
 
-void DeviceProblem::get_border(
+void DeviceKernels::get_border(
     double* out, double* data,
     int a_size, int b_size,
     int border_idx, layer_tag tag)
@@ -151,7 +155,7 @@ void DeviceProblem::get_border(
         border_idx, tag)));
 }
 
-void DeviceProblem::set_border(
+void DeviceKernels::set_border(
     double* dest, double* data,
     int a_size, int b_size,
     int border_idx, layer_tag tag)
@@ -162,15 +166,15 @@ void DeviceProblem::set_border(
         border_idx, tag)));
 }
 
-double DeviceProblem::compute(double* out, double* data, mydim3<double> height)
+double DeviceKernels::compute(double* out, double* data, mydim3<double> height)
 {
     START_KERNEL((
         compute_kernel<<<BORDER_DIMS_3D(kernel_block_dim, kernel_grid_dim)>>>(
-            out, data, grid, grid.bsize, height)));
+            out, data, grid, height)));
 
     START_KERNEL((
         abs_error_kernel<<<BORDER_DIMS_3D(kernel_block_dim, kernel_grid_dim)>>>(
-            data, out, grid, grid.bsize)));
+            data, out, grid)));
 
     thrust::device_ptr<double> dev_ptr = thrust::device_pointer_cast(data);
     double error = *thrust::max_element(dev_ptr, dev_ptr + grid.cells_per_block());

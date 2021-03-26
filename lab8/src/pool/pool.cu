@@ -5,21 +5,25 @@
 
 #include <cassert>
 
-GPU_pool::Elem::Elem(const BlockGrid& grid)
+Device::Elem::Elem(const BlockGrid& grid)
     : grid(grid)
-    , DeviceProblem(grid)
+    , DeviceKernels(grid)
 {
-    const uint buffer_size = uint(grid.cells_per_block()) * sizeof(double);
-    debug("init gpu array with %d size", buffer_size);
-    CUDA_ERR(cudaMalloc(&gpu_data, buffer_size));
-    CUDA_ERR(cudaMalloc(&gpu_data_next, buffer_size));
+    const uint data_size = uint(grid.cells_per_block()) * sizeof(double);
+    debug("init gpu array with %d size", data_size);
+    CUDA_ERR(cudaMalloc(&gpu_data, data_size));
+    CUDA_ERR(cudaMalloc(&gpu_data_next, data_size));
+
+    const int max_dim = *grid.bsize.max_dim();
+    CUDA_ERR(cudaMalloc(&gpu_buffer, max_dim * max_dim * sizeof(double)));
 }
 
-GPU_pool::Elem::~Elem()
+Device::Elem::~Elem()
 {
     debug("free array");
     CUDA_ERR(cudaFree(gpu_data));
     CUDA_ERR(cudaFree(gpu_data_next));
+    CUDA_ERR(cudaFree(gpu_buffer));
 }
 
 int get_layer_idx(const BlockGrid& grid, side_tag border)
@@ -27,12 +31,12 @@ int get_layer_idx(const BlockGrid& grid, side_tag border)
     switch (border) {
     default:
     case LEFT:
-    case TOP:
+    case BOTTOM:
     case FRONT:
         return -1;
     case RIGHT:
         return grid.bsize.x;
-    case BOTTOM:
+    case TOP:
         return grid.bsize.y;
     case BACK:
         return grid.bsize.z;
@@ -52,51 +56,48 @@ std::pair<int, int> other_sizes(const BlockGrid& grid, layer_tag tag)
     }
 }
 
-void GPU_pool::Elem::load_data(std::vector<double>& dst)
+void Device::Elem::load_data(std::vector<double>& dst)
 {
-    const uint buffer_size = uint(grid.cells_per_block()) * sizeof(double);
-    CUDA_ERR(cudaMemcpy(dst.data(), gpu_data, buffer_size, cudaMemcpyDeviceToHost));
+    const uint data_size = uint(grid.cells_per_block()) * sizeof(double);
+    CUDA_ERR(cudaMemcpy(dst.data(), gpu_data, data_size, cudaMemcpyDeviceToHost));
 }
 
-void GPU_pool::Elem::store_data(std::vector<double>& src)
+void Device::Elem::store_data(std::vector<double>& src)
 {
-    const uint buffer_size = uint(grid.cells_per_block()) * sizeof(double);
-    CUDA_ERR(cudaMemcpy(gpu_data, src.data(), buffer_size, cudaMemcpyHostToDevice));
+    const uint data_size = uint(grid.cells_per_block()) * sizeof(double);
+    CUDA_ERR(cudaMemcpy(gpu_data, src.data(), data_size, cudaMemcpyHostToDevice));
 }
 
-void GPU_pool::Elem::load_border(std::vector<double>& dst, side_tag border)
+void Device::Elem::load_border(std::vector<double>& dst, side_tag border)
 {
     // debug("load border %d", border);
     int layer_idx = get_layer_idx(grid, border);
+    if (layer_idx == -1) {
+        ++layer_idx;
+    } else {
+        --layer_idx;
+    }
     layer_tag layer = side_tag_to_layer_tag(border);
     std::pair<int, int> sizes = other_sizes(grid, layer);
     const int data_size = sizes.first * sizes.second;
-    this->get_border(gpu_data_next, gpu_data, sizes.first, sizes.second, layer_idx, layer);
-    CUDA_ERR(cudaMemcpy(dst.data(), gpu_data_next, data_size * sizeof(double), cudaMemcpyDeviceToHost));
+    this->get_border(gpu_buffer, gpu_data, sizes.first, sizes.second, layer_idx, layer);
+    CUDA_ERR(cudaMemcpy(dst.data(), gpu_buffer, data_size * sizeof(double), cudaMemcpyDeviceToHost));
 }
 
-void GPU_pool::Elem::store_border(std::vector<double>& src, side_tag border)
+void Device::Elem::store_border(std::vector<double>& src, side_tag border)
 {
     // debug("store border %d", border);
     int layer_idx = get_layer_idx(grid, border);
     layer_tag layer = side_tag_to_layer_tag(border);
     std::pair<int, int> sizes = other_sizes(grid, layer);
-    // debug("on device");
-    // for (int i = 0; i < sizes.first; ++i) {
-    //     for (int j = 0; j < sizes.second; ++j) {
-    //         std::cerr << src[i * sizes.second + j] << " ";
-    //     }
-    //     std::cerr << std::endl;
-    // }
-    // std::cerr << std::endl;
-    // debug("on device end");
     const int data_size = sizes.first * sizes.second;
-    CUDA_ERR(cudaMemcpy(gpu_data_next, src.data(), data_size * sizeof(double), cudaMemcpyHostToDevice));
-    this->set_border(gpu_data, gpu_data_next, sizes.first, sizes.second, layer_idx, layer);
+    CUDA_ERR(cudaMemcpy(gpu_buffer, src.data(), data_size * sizeof(double), cudaMemcpyHostToDevice));
+    this->set_border(gpu_data, gpu_buffer, sizes.first, sizes.second, layer_idx, layer);
 }
 
-double GPU_pool::Elem::calculate(mydim3<double> height)
+double Device::Elem::calculate(mydim3<double> height)
 {
+    // debug("compute");
     double err = this->compute(gpu_data_next, gpu_data, height);
     std::swap(gpu_data, gpu_data_next);
     return err;

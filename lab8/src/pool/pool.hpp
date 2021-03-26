@@ -12,13 +12,15 @@ struct split_by {
     split_by(int need_split, int n_parts, int min_part_size);
 };
 
-class GPU_pool {
+class Device {
     const Grid& grid;
     const mydim3<double> height;
     Task task;
 
-    class Elem : DeviceProblem {
+    class Elem : DeviceKernels {
         const BlockGrid& grid;
+
+        double* gpu_buffer;
         double* gpu_data;
         double* gpu_data_next;
 
@@ -37,12 +39,12 @@ class GPU_pool {
     Elem device;
 
     void move_border(side_tag border, bool to_device);
-    void show(std::ostream& out);
 
 public:
+    void show(std::ostream& out);
     std::vector<double> data;
 
-    GPU_pool(const Grid& grid, Task task);
+    Device(const Grid& grid, Task task);
 
     // TODO texcl=true
 

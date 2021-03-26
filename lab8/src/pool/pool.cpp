@@ -29,7 +29,7 @@ split_by::split_by(int need_split, int n_parts, int min_part_size)
 // Нет смысла делить маленькие данные. Проще (и быстрее) запихнуть их на один GPU
 #define MIN_GPU_SPLIT_SIZE 5000
 
-GPU_pool::GPU_pool(const Grid& grid, Task task)
+Device::Device(const Grid& grid, Task task)
     : grid(grid)
     , height(grid.height(task.l_size))
     , task(task)
@@ -39,24 +39,23 @@ GPU_pool::GPU_pool(const Grid& grid, Task task)
     device.store_data(data);
 }
 
-void GPU_pool::load_gpu_border(side_tag border) { device.load_border(data, border); }
-void GPU_pool::store_gpu_border(side_tag border)
+void Device::load_gpu_border(side_tag border) { device.load_border(data, border); }
+void Device::store_gpu_border(side_tag border)
 {
-    // debug("before store");
-    // show(std::cerr);
+    // debug("store border: %d", border);
     device.store_border(data, border);
     // debug("after store");
     // show(std::cerr);
 }
-void GPU_pool::load_gpu_data() { device.load_data(data); }
+void Device::load_gpu_data() { device.load_data(data); }
 
-void GPU_pool::show(std::ostream& out)
+void Device::show(std::ostream& out)
 {
     std::vector<double> temp(data.capacity());
     device.load_data(temp);
-    for (int i = -1; i <= grid.bsize.x; ++i) {
+    for (int k = -1; k <= grid.bsize.z; ++k) {
         for (int j = -1; j <= grid.bsize.y; ++j) {
-            for (int k = -1; k <= grid.bsize.z; ++k) {
+            for (int i = -1; i <= grid.bsize.x; ++i) {
                 out << temp[grid.cell_absolute_id(i, j, k)] << " ";
             }
             out << std::endl;
@@ -66,7 +65,7 @@ void GPU_pool::show(std::ostream& out)
     out << std::endl;
 }
 
-double GPU_pool::calc()
+double Device::calc()
 {
     // show(std::cerr);
     double err = device.calculate(height);

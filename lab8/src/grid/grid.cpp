@@ -62,6 +62,7 @@ std::ostream& operator<<(std::ostream& out, const Grid& data)
 
 int Grid::max_size() const { return std::max(bsize.x, std::max(bsize.y, bsize.z)); }
 
+int Grid::block_absolute_id(mydim3<int> p) const { return block_absolute_id(p.x, p.y, p.z); }
 int Grid::block_absolute_id(int i, int j, int k) const
 {
     return k * (n_blocks.x * n_blocks.y) + j * n_blocks.x + i;

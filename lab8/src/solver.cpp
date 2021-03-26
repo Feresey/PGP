@@ -20,28 +20,29 @@ std::ostream& operator<<(std::ostream& out, const Solver& solver)
     return out;
 }
 
-void Solver::solve(GPU_pool& pool, const std::string& output)
+void Solver::solve(Device& pool, const std::string& output)
 {
     Exchange exchange(grid, task, pool);
     debug("create exchanger");
 
     MPI_Barrier(MPI_COMM_WORLD);
     double error = 100.0;
+    int fuck = 2;
     while (error > task.eps) {
         // debug("do iteration");
         exchange.boundary_layer_exchange();
         MPI_Barrier(MPI_COMM_WORLD);
 
         debug("before calc");
-        pool.load_gpu_data();
-        exchange.write_result(std::cerr);
+        pool.show(std::cerr);
         double local_error = pool.calc();
         debug("after calc, error = %e", local_error);
-        pool.load_gpu_data();
-        exchange.write_result(std::cerr);
+        pool.show(std::cerr);
         error = this->calc_error(local_error);
 
-        // MPI_Abort(MPI_COMM_WORLD, MPI_ERR_ASSERT);
+        // if (--fuck == 0) {
+        //     MPI_Abort(MPI_COMM_WORLD, MPI_ERR_ASSERT);
+        // }
     }
     MPI_Barrier(MPI_COMM_WORLD);
 

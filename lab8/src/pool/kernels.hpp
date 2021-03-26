@@ -26,7 +26,7 @@ dim3_type layer_tag_to_dim3_type(layer_tag tag);
 layer_tag dim3_type_to_layer_tag(dim3_type type);
 layer_tag side_tag_to_layer_tag(side_tag tag);
 
-class DeviceProblem {
+class DeviceKernels {
     BlockGrid grid;
     int kernel_grid_dim, kernel_block_dim;
 
@@ -44,7 +44,7 @@ protected:
     double compute(double* out, double* data, mydim3<double> height);
 
 public:
-    DeviceProblem(BlockGrid grid, int kernel_grid_dim = 8, int kernel_block_dim = 8);
+    DeviceKernels(BlockGrid grid, int kernel_grid_dim = 8, int kernel_block_dim = 8);
 };
 
 #endif

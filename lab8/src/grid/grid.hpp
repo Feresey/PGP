@@ -29,6 +29,7 @@ struct Grid : BlockGrid {
     int max_size() const;
 
     int block_absolute_id(int i, int j, int k) const;
+    int block_absolute_id(mydim3<int> p) const;
     mydim3<int> block_idx() const;
 
     //@ ну да, это скорее к Problem относится@

@@ -47,7 +47,7 @@ int main(int argc, char** argv)
     task.mpi_bcast();
 
     debug("after bcast");
-    GPU_pool pool = GPU_pool(grid, task);
+    Device pool = Device(grid, task);
     Solver solver(grid, task);
     debug("after init");
 
