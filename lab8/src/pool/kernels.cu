@@ -192,10 +192,10 @@ dim3_type side_tag_to_dim3_type(side_tag tag)
         return DIM3_TYPE_X;
     case TOP:
     case BOTTOM:
-        return DIM3_TYPE_Y;
+        return DIM3_TYPE_Z;
     case FRONT:
     case BACK:
-        return DIM3_TYPE_Z;
+        return DIM3_TYPE_Y;
     }
 }
 
@@ -218,9 +218,9 @@ layer_tag dim3_type_to_layer_tag(dim3_type type)
     default:
     case DIM3_TYPE_X:
         return LEFT_RIGHT;
-    case DIM3_TYPE_Z:
-        return FRONT_BACK;
     case DIM3_TYPE_Y:
+        return FRONT_BACK;
+    case DIM3_TYPE_Z:
         return VERTICAL;
     }
 }

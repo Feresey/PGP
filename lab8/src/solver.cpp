@@ -27,22 +27,18 @@ void Solver::solve(Device& pool, const std::string& output)
 
     MPI_Barrier(MPI_COMM_WORLD);
     double error = 100.0;
-    int fuck = 2;
+
     while (error > task.eps) {
         // debug("do iteration");
         exchange.boundary_layer_exchange();
         MPI_Barrier(MPI_COMM_WORLD);
 
-        debug("before calc");
-        pool.show(std::cerr);
+        // debug("before calc");
+        // pool.show(std::cerr);
         double local_error = pool.calc();
         debug("after calc, error = %e", local_error);
-        pool.show(std::cerr);
+        // pool.show(std::cerr);
         error = this->calc_error(local_error);
-
-        // if (--fuck == 0) {
-        //     MPI_Abort(MPI_COMM_WORLD, MPI_ERR_ASSERT);
-        // }
     }
     MPI_Barrier(MPI_COMM_WORLD);
 

@@ -18,21 +18,21 @@ void Exchange::exchange2D(dim3_type block_coord)
     double lower_init, upper_init;
     side_tag lower_tag, upper_tag;
 
-    switch (block_coord) {
+    switch (dim3_type_to_layer_tag(block_coord)) {
     default:
-    case DIM3_TYPE_X:
+    case LEFT_RIGHT:
         lower_tag = LEFT;
         lower_init = task.u_left;
         upper_tag = RIGHT;
         upper_init = task.u_right;
         break;
-    case DIM3_TYPE_Y:
+    case FRONT_BACK:
         lower_tag = FRONT;
         lower_init = task.u_front;
         upper_tag = BACK;
         upper_init = task.u_back;
         break;
-    case DIM3_TYPE_Z:
+    case VERTICAL:
         lower_tag = BOTTOM;
         lower_init = task.u_bottom;
         upper_tag = TOP;
@@ -40,17 +40,19 @@ void Exchange::exchange2D(dim3_type block_coord)
         break;
     }
 
-    int a_size = -1, b_size = -1;
-    for (auto elem = grid.bsize.begin(); elem != grid.bsize.end(); ++elem) {
-        if (elem.get_type() == block_coord) {
-            continue;
-        }
-        if (a_size == -1) {
-            a_size = *elem;
-        } else {
-            b_size = *elem;
-        }
-    }
+    std::pair<int,int> sizes = other_sizes(grid, dim3_type_to_layer_tag(block_coord));
+    int a_size = sizes.first, b_size = sizes.second;
+    // for (auto elem = grid.bsize.begin(); elem != grid.bsize.end(); ++elem) {
+    //     if (elem.get_type() == block_coord) {
+    //         continue;
+    //     }
+    //     if (a_size == -1) {
+    //         a_size = *elem;
+    //     } else {
+    //         b_size = *elem;
+    //     }
+    // }
+    debug("sizes (%d,%d)", a_size, b_size);
 
     const int count = a_size * b_size;
     const mydim3<int> block_absolute_idx = grid.block_idx();
@@ -71,7 +73,7 @@ void Exchange::exchange2D(dim3_type block_coord)
             mydim3<int> exchange_block = block_absolute_idx;
             exchange_block[block_coord] = block_idx + ((each == 0) ? -1 : 1);
             const int exchange_process_rank = grid.block_absolute_id(exchange_block);
-            debug("load border %d", tag1);
+            // debug("load border %d", tag1);
             pool.load_gpu_border(tag1);
 
             //@ отсылка и прием нижнего граничного условия@
@@ -79,14 +81,11 @@ void Exchange::exchange2D(dim3_type block_coord)
                 for (int b = 0; b < b_size; ++b) {
                     size_t idx = size_t(a * b_size + b);
                     send_buffer[idx] = pool.data[idx];
-                    std::cerr << pool.data[idx] << " ";
+                    // std::cerr << pool.data[idx] << " ";
                 }
-                std::cerr << std::endl;
+                // std::cerr << std::endl;
             }
-            std::cerr << std::endl;
-
-            debug("show all data");
-            pool.show(std::cerr);
+            // std::cerr << std::endl;
 
             // CSC(MPI_Sendrecv(
             //     send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag1,
@@ -107,14 +106,17 @@ void Exchange::exchange2D(dim3_type block_coord)
         }
 
         pool.store_gpu_border(tag1);
+        // debug("show all data");
+        // pool.show(std::cerr);
     }
 }
 
 void Exchange::boundary_layer_exchange()
 {
-    exchange2D(DIM3_TYPE_X);
-    exchange2D(DIM3_TYPE_Y);
     exchange2D(DIM3_TYPE_Z);
+    // MPI_Abort(MPI_COMM_WORLD, MPI_ERR_ASSERT);
+    exchange2D(DIM3_TYPE_Y);
+    exchange2D(DIM3_TYPE_X);
 }
 
 void Exchange::write_layer(int j, int k, int block_idx, std::ostream& out)

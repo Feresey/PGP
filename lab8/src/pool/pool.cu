@@ -37,9 +37,9 @@ int get_layer_idx(const BlockGrid& grid, side_tag border)
     case RIGHT:
         return grid.bsize.x;
     case TOP:
-        return grid.bsize.y;
-    case BACK:
         return grid.bsize.z;
+    case BACK:
+        return grid.bsize.y;
     }
 }
 
@@ -48,11 +48,11 @@ std::pair<int, int> other_sizes(const BlockGrid& grid, layer_tag tag)
     switch (tag) {
     default:
     case LEFT_RIGHT:
-        return { grid.bsize.y, grid.bsize.z };
+        return { grid.bsize.z, grid.bsize.y };
     case VERTICAL:
-        return { grid.bsize.x, grid.bsize.z };
+        return { grid.bsize.y, grid.bsize.x };
     case FRONT_BACK:
-        return { grid.bsize.x, grid.bsize.y };
+        return { grid.bsize.z, grid.bsize.x };
     }
 }
 

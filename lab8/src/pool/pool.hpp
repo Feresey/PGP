@@ -12,6 +12,8 @@ struct split_by {
     split_by(int need_split, int n_parts, int min_part_size);
 };
 
+std::pair<int, int> other_sizes(const BlockGrid& grid, layer_tag tag);
+
 class Device {
     const Grid& grid;
     const mydim3<double> height;
