@@ -40,7 +40,7 @@ void Exchange::exchange2D(dim3_type block_coord)
         break;
     }
 
-    std::pair<int,int> sizes = other_sizes(grid, dim3_type_to_layer_tag(block_coord));
+    std::pair<int, int> sizes = other_sizes(grid, dim3_type_to_layer_tag(block_coord));
     int a_size = sizes.first, b_size = sizes.second;
     // for (auto elem = grid.bsize.begin(); elem != grid.bsize.end(); ++elem) {
     //     if (elem.get_type() == block_coord) {
@@ -168,12 +168,12 @@ void Exchange::write_result(std::ostream& out)
 void Exchange::send_result()
 {
     pool.load_gpu_data();
-    for (int i = 0; i < grid.bsize.z; ++i) {
+    for (int k = 0; k < grid.bsize.z; ++k) {
         for (int j = 0; j < grid.bsize.y; ++j) {
-            for (int k = 0; k < grid.bsize.x; ++k) {
-                send_buffer[size_t(k)] = pool.data[grid.cell_absolute_id(i, j, k)];
+            for (int i = 0; i < grid.bsize.x; ++i) {
+                send_buffer[size_t(i)] = pool.data[grid.cell_absolute_id(i, j, k)];
             }
-            int tag = i * grid.bsize.z + j;
+            int tag = k * grid.bsize.z + j;
             MPI_Send(send_buffer.data(), grid.bsize.x, MPI_DOUBLE, ROOT_RANK, tag, MPI_COMM_WORLD);
         }
     }
