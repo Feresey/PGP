@@ -17,13 +17,22 @@ void Solver::solve(Problem& problem, const std::string& output)
 
     MPI_Barrier(MPI_COMM_WORLD);
     double error = DBL_MAX;
+    int fuck = 2;
     while (error > task.eps) {
         exchange.boundary_layer_exchange();
         MPI_Barrier(MPI_COMM_WORLD);
 
+        std::cerr << "before calc" << std::endl;
+        problem.show(std::cerr);
+        exchange.write_result(std::cerr);
         double local_error = problem.calc();
-        // exchange.write_result(std::cerr);
         error = this->calc_error(local_error);
+        std::cerr << "after calc, error " << local_error << std::endl;
+        // problem.show(std::cerr);
+        // exchange.write_result(std::cerr);
+        // if (--fuck == 0) {
+        //     MPI_Abort(MPI_COMM_WORLD, MPI_ERR_ASSERT);
+        // }
     }
     MPI_Barrier(MPI_COMM_WORLD);
 

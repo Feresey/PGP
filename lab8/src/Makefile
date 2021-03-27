@@ -38,14 +38,36 @@ $(COPY_TARGETS): COPY_%:
 	cp $* $(DESTDIR)/$(dir $*)
 
 define stupidmake
-all:
-	+$$(MAKE) -f build.mk TARGET_BIN=$(TARGET) CFLAGS= NVCCFLAGS=-rdc=true GCCFLAGS=
+CXX    ?= $(CXX)
+NVCC   ?= $(NVCC)
+MPICXX ?= $(MPICXX)
+
+.PHONY: all
+all: $(TARGET)
+
+CU_SOURCES  = $(CU_SOURCES)
+CPP_SOURCES = $(CPP_SOURCES)
+
+CPP_OBJECTS = $$(foreach obj,$$(CPP_SOURCES),$$(obj).o)
+CU_OBJECTS = $$(foreach obj,$$(CU_SOURCES),$$(obj).o)
+
+TARGET_OBJECTS = $$(CPP_OBJECTS) $$(CU_OBJECTS)
+
+LDFLAGS = -lm -lmpi
+IFLAGS = -I.
+NVCCFLAGS = -rdc=true
+
+$(TARGET): $$(TARGET_OBJECTS)
+	$$(NVCC) -ccbin=$$(MPICXX) $$(NVCCFLAGS) $$(IFLAGS) $$(LDFLAGS) $$^ -o $$@
+
+$$(CPP_OBJECTS): %.o:
+	$$(CXX) $$(GCCFLAGS) $$(IFLAGS) -c $$* -o $$@
+
+$$(CU_OBJECTS): %.o:
+	$$(NVCC) $$(NVCCFLAGS) $$(IFLAGS) -c $$* -o $$@
 endef
 
 copy: $(COPY_TARGETS)
-	cp $(CURDIR)/Makefile $(DESTDIR)/build.mk
-	cp $(CURDIR)/deps.mk $(DESTDIR)
-	mkdir -p $(DESTDIR)/build
 	$(file > $(DESTDIR)/Makefile,$(stupidmake))
 
 CPP_DEPS_LIST = $(foreach dep,$(CPP_SOURCES),$(DEPS_DIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(dep))).mk)
