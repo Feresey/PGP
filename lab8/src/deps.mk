@@ -1,3 +1,4 @@
+build/device.cu.o: device.cu helpers.cuh
 build/dim3__dim3.cpp.o: dim3/dim3.cpp dim3/dim3.hpp helpers.hpp
 build/exchange.cpp.o: dim3/dim3.hpp exchange.cpp exchange.hpp grid/grid.hpp helpers.cuh helpers.hpp pool/kernels.hpp pool/pool.hpp pool/task.hpp
 build/grid__grid.cu.o: dim3/dim3.hpp grid/grid.cpp grid/grid.cu grid/grid.hpp helpers.cuh helpers.hpp

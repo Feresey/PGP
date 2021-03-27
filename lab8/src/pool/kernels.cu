@@ -124,7 +124,7 @@ __global__ void abs_error_kernel(double* out, double* data, BlockGrid grid)
         for (int j = idy - 1; j <= grid.bsize.y; j += offset_y) {
             for (int k = idz - 1; k <= grid.bsize.z; k += offset_z) {
                 int cell_id = grid.cell_absolute_id(i, j, k);
-                if ((i | j | k) == -1
+                if (i == -1 || j == -1 || k == -1
                     || i == grid.bsize.x || j == grid.bsize.y || k == grid.bsize.z) {
                     out[cell_id] = 0.0;
                 } else {

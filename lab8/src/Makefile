@@ -2,7 +2,8 @@ BUILDDIR := build
 BINDIR   ?= bin
 DEPS_DIR := $(BUILDDIR)/deps
 
-TARGET_BIN ?= $(BINDIR)/target
+TARGET ?= target
+TARGET_BIN ?= $(BINDIR)/$(TARGET)
 
 CXX    ?= g++
 NVCC   ?= nvcc
@@ -18,18 +19,18 @@ clean:
 $(DEPS_DIR) $(BUILDDIR) $(BINDIR):
 	-mkdir -p "$@"
 
-HEADERS = solver.hpp exchange.hpp helpers.cuh \
+HEADERS = solver.hpp exchange.hpp helpers.cuh helpers.hpp \
 		grid/grid.hpp dim3/dim3.hpp \
 		pool/pool.hpp pool/task.hpp pool/kernels.hpp
 
-CU_SOURCES  = pool/kernels.cu pool/pool.cu grid/grid.cu
+CU_SOURCES  = device.cu pool/kernels.cu pool/pool.cu grid/grid.cu
 CPP_SOURCES = main.cpp solver.cpp exchange.cpp \
 		dim3/dim3.cpp \
 		pool/pool.cpp pool/task.cpp
 
 SOURCES = $(CPP_SOURCES)
 
-COPY_TARGETS = $(addprefix COPY_,$(CPP_SOURCES) $(HEADERS))
+COPY_TARGETS = $(addprefix COPY_,$(CU_SOURCES) $(CPP_SOURCES) grid/grid.cpp $(HEADERS))
 
 .PHONY: $(COPY_TARGETS)
 $(COPY_TARGETS): COPY_%:
@@ -38,10 +39,13 @@ $(COPY_TARGETS): COPY_%:
 
 define stupidmake
 all:
-	$(MPICXX) $(IFLAGS) $(LDFLAGS) $(CPP_SOURCES) -o $(TARGET)
+	+$$(MAKE) -f build.mk TARGET_BIN=$(TARGET) CFLAGS= NVCCFLAGS=-rdc=true GCCFLAGS=
 endef
 
 copy: $(COPY_TARGETS)
+	cp $(CURDIR)/Makefile $(DESTDIR)/build.mk
+	cp $(CURDIR)/deps.mk $(DESTDIR)
+	mkdir -p $(DESTDIR)/build
 	$(file > $(DESTDIR)/Makefile,$(stupidmake))
 
 CPP_DEPS_LIST = $(foreach dep,$(CPP_SOURCES),$(DEPS_DIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(dep))).mk)
@@ -68,9 +72,8 @@ $(DEPS_LIST): $(DEPS_DIR)/%.mk: | $(DEPS_DIR)
 		sort -u \
 		))
 
-.PHONY: deps.mk
-deps.mk: $(DEPS_LIST) | $(DEPS_DIR)
-	@cat $(sort $(DEPS_LIST)) > $@
+deps: $(DEPS_LIST) | $(DEPS_DIR)
+	@cat $(sort $(DEPS_LIST)) > deps.mk
 
 -include deps.mk
 
@@ -107,11 +110,6 @@ CFLAGS    += -g3
 NVCCFLAGS += -G
 endif
 NVCCFLAGS += --compiler-options "$(CFLAGS)"
-
-define stupidmake
-all:
-	$(NVCC) -ccbin=$(MPICXX) $(NVCCFLAGS) $(IFLAGS) $(LDFLAGS) $(CU_SOURCES) $(CPP_SOURCES) -o $(TARGET)
-endef
 
 
 $(TARGET_BIN): $(TARGET_OBJECTS) | $(BINDIR)

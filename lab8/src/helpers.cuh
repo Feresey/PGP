@@ -27,6 +27,9 @@ static const clock_t start_time = clock();
         fflush(stderr);                                                                                                              \
     } while (false)
 
+void setDevice(int);
+void getDeviceCount(int*);
+
 #ifndef __NVCC__
 #include "dim3/dim3.hpp"
 

@@ -46,15 +46,17 @@ int main(int argc, char** argv)
     grid.mpi_bcast();
     task.mpi_bcast();
 
-    debug("after bcast");
-    Device pool = Device(grid, task);
+    int n_devices;
+    getDeviceCount(&n_devices);
+    setDevice(rank % n_devices);
+
+    Device device = Device(grid, task);
     Solver solver(grid, task);
-    debug("after init");
 
     std::cerr << solver << std::endl;
 
     debug("before solve");
-    solver.solve(pool, output);
+    solver.solve(device, output);
     debug("after solve");
 
     MPI_ERR(MPI_Finalize());
