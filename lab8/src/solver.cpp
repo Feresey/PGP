@@ -33,21 +33,16 @@ void Solver::solve(Device& pool, const std::string& output)
         exchange.boundary_layer_exchange();
         MPI_Barrier(MPI_COMM_WORLD);
 
-        debug("before calc");
-        pool.show(std::cerr);
+        // debug("before calc");
+        // pool.show(std::cerr);
         double local_error = pool.calc();
-        debug("after calc, error = %e", local_error);
-        pool.show(std::cerr);
+        // debug("after calc, error = %e", local_error);
+        // pool.show(std::cerr);
         error = this->calc_error(local_error);
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    if (grid.process_rank == ROOT_RANK) {
-        std::fstream out(output, out.trunc | out.out);
-        exchange.write_result(out);
-    } else {
-        exchange.send_result();
-    }
+    exchange.write_result(output);
 }
 
 double Solver::calc_error(double local_error) const
