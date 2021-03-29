@@ -51,11 +51,8 @@ void Exchange::exchange2D(
             for (int a = 0; a < a_size; ++a) {
                 for (int b = 0; b < b_size; ++b) {
                     send_buffer[size_t(a * b_size + b)] = problem.data[get_cell_idx(copy_cell, a, b)];
-                    std::cerr << problem.data[get_cell_idx(copy_cell, a, b)] << " ";
                 }
-                std::cerr << std::endl;
             }
-            std::cerr << std::endl;
 
             // CSC(MPI_Sendrecv(
             //     send_buffer.data(), count, MPI_DOUBLE, exchange_process_rank, tag1,
@@ -69,17 +66,13 @@ void Exchange::exchange2D(
 
             MPI_ERR(MPI_Wait(&req1, MPI_STATUS_IGNORE));
             MPI_ERR(MPI_Wait(&req2, MPI_STATUS_IGNORE));
-            std::cerr << "receive border " << tag1 << std::endl;
         }
-        // std::cerr << "store border " << ((each == 0) ? recvtag_lower : recvtag_upper) << std::endl;
 
         for (int a = 0; a < a_size; ++a) {
             for (int b = 0; b < b_size; ++b) {
                 problem.data[get_cell_idx(bound_cell, a, b)] = (is_boundary) ? init_val : receive_buffer[size_t(a * b_size + b)];
             }
         }
-
-        // problem.show(std::cerr);
     }
 }
 
