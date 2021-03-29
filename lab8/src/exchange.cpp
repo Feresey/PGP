@@ -121,31 +121,35 @@ void Exchange::boundary_layer_exchange()
     exchange2D(DIM3_TYPE_X);
 }
 
+//*
+
 void Exchange::write_result(const std::string& output)
 {
     int n_outputs_per_block = grid.bsize.y * grid.bsize.z;
     mydim3<int> block_idx = grid.block_idx();
 
     // одна строчка по x координате
-    MPI::Datatype string_type(MPI_CHAR);
+    MPI_Datatype string_type;
     int len = snprintf(NULL, 0, "%e", double(0.0));
     int str_size = (len + 1) * grid.bsize.x;
-    string_type = string_type.Create_contiguous(str_size);
-    string_type.Commit();
+    MPI_ERR(MPI_Type_contiguous(str_size, MPI_CHAR, &string_type));
+    MPI_ERR(MPI_Type_commit(&string_type));
 
-    MPI::Datatype pattern_type(string_type);
+    MPI_Datatype pattern_type;
     // пусть строчки всегда будут по одной
     const std::vector<int> pattern_lens(size_t(n_outputs_per_block), 1);
     std::vector<MPI_Aint> pattern_disps(static_cast<size_t>(n_outputs_per_block));
 
     pattern_disps[0] = 0;
     for (int i = 1; i < n_outputs_per_block; ++i) {
-        pattern_disps[size_t(i)] = pattern_disps[size_t(i - 1)] + grid.n_blocks.x*str_size;
+        pattern_disps[size_t(i)] = pattern_disps[size_t(i - 1)] + grid.n_blocks.x * str_size;
     }
 
     // ну оффсеты всегда кратны размеру string_type, так что хватило бы и MPI_Type_create_indexed.
-    pattern_type = pattern_type.Create_hindexed(n_outputs_per_block, pattern_lens.data(), pattern_disps.data());
-    pattern_type.Commit();
+    MPI_ERR(MPI_Type_create_hindexed(n_outputs_per_block, pattern_lens.data(), pattern_disps.data(), string_type, &pattern_type));
+    MPI_ERR(MPI_Type_commit(&pattern_type));
+    // pattern_type = pattern_type.Create_hindexed(n_outputs_per_block, pattern_lens.data(), pattern_disps.data());
+    // pattern_type.Commit();
 
     std::string res(static_cast<size_t>(str_size * grid.bsize.y * grid.bsize.z + 1), ' ');
     res.resize(0);
@@ -171,9 +175,11 @@ void Exchange::write_result(const std::string& output)
         }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_ERR(MPI_Barrier(MPI_COMM_WORLD));
 
-    MPI::File fd(fd.Open(MPI_COMM_WORLD, output.data(), MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL));
+    MPI_File fd;
+    MPI_ERR(MPI_File_open(MPI_COMM_WORLD, output.data(), MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &fd));
+    // fd.Open(MPI_COMM_WORLD, output.data(), MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL));
 
     int y_stride = grid.bsize.x * grid.n_blocks.x;
     int z_stride = y_stride * grid.bsize.y * grid.n_blocks.y;
@@ -183,15 +189,85 @@ void Exchange::write_result(const std::string& output)
 
     int disp = (z_stride * global_z + y_stride * global_y + block_idx.x * grid.bsize.x) / grid.bsize.x * str_size;
     debug("write file with base offset %d.\n%s", disp, res.data());
-    fd.Set_view(disp, string_type, pattern_type, "native", MPI_INFO_NULL);
+    // fd.Set_view(disp, string_type, pattern_type, "native", MPI_INFO_NULL);
+    MPI_ERR(MPI_File_set_view(fd, disp, string_type, pattern_type, "native", MPI_INFO_NULL));
     // fd.Set_size(0);
-    MPI::Status status;
-    fd.Write(res.data(), n_outputs_per_block, string_type, status);
-    MPI_ERR(status.Get_error());
+    // MPI::Status status;
+    MPI_ERR(MPI_File_write(fd, res.data(), n_outputs_per_block, string_type, MPI_STATUS_IGNORE));
+    // fd.Write(res.data(), n_outputs_per_block, string_type, status);
+    // MPI_ERR(status.Get_error());
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_ERR(MPI_Barrier(MPI_COMM_WORLD));
 
-    fd.Close();
-    string_type.Free();
-    pattern_type.Free();
+    MPI_ERR(MPI_File_close(&fd));
+    MPI_ERR(MPI_Type_free(&string_type));
+    MPI_ERR(MPI_Type_free(&pattern_type));
+    // fd.Close();
+    // string_type.Free();
+    // pattern_type.Free();
 }
+
+/*/
+
+void Exchange::write_layer(int j, int k, int block_idx, std::ostream& out)
+{
+    if (block_idx == 0) {
+        pool.load_gpu_data();
+        for (int i = 0; i < grid.bsize.x; ++i) {
+            receive_buffer[size_t(i)] = pool.data[grid.cell_absolute_id(i, j, k)];
+        }
+    } else {
+        int tag = k * grid.bsize.z + j;
+        MPI_ERR(MPI_Recv(receive_buffer.data(), grid.bsize.x, MPI_DOUBLE, block_idx, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
+    }
+
+    for (int i = 0; i < grid.bsize.x; ++i) {
+        if (i != 0) {
+            out << " ";
+        }
+        out << receive_buffer[size_t(i)];
+    }
+}
+
+void Exchange::write_result(std::ostream& out)
+{
+    if (grid.process_rank != ROOT_RANK) {
+        send_result();
+        return;
+    }
+    out << std::scientific;
+
+    for (int bk = 0; bk < grid.n_blocks.z; ++bk) {
+        for (int k = 0; k < grid.bsize.z; ++k) {
+            for (int bj = 0; bj < grid.n_blocks.y; ++bj) {
+                for (int j = 0; j < grid.bsize.y; ++j) {
+                    for (int bi = 0; bi < grid.n_blocks.x; ++bi) {
+                        int block_idx = grid.block_absolute_id(bi, bj, bk);
+                        if (bi != 0) {
+                            out << " ";
+                        }
+                        this->write_layer(j, k, block_idx, out);
+                    }
+                    out << std::endl;
+                }
+            }
+            out << std::endl;
+        }
+    }
+}
+
+void Exchange::send_result()
+{
+    pool.load_gpu_data();
+    for (int k = 0; k < grid.bsize.z; ++k) {
+        for (int j = 0; j < grid.bsize.y; ++j) {
+            for (int i = 0; i < grid.bsize.x; ++i) {
+                send_buffer[size_t(i)] = pool.data[grid.cell_absolute_id(i, j, k)];
+            }
+            int tag = k * grid.bsize.z + j;
+            MPI_Send(send_buffer.data(), grid.bsize.x, MPI_DOUBLE, ROOT_RANK, tag, MPI_COMM_WORLD);
+        }
+    }
+}
+
+//*/

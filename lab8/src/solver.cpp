@@ -43,6 +43,13 @@ void Solver::solve(Device& pool, const std::string& output)
     MPI_Barrier(MPI_COMM_WORLD);
 
     exchange.write_result(output);
+
+    // if (grid.process_rank == ROOT_RANK) {
+    //     std::fstream out(output, out.trunc | out.out);
+    //     exchange.write_result(out);
+    // } else {
+    //     exchange.send_result();
+    // }
 }
 
 double Solver::calc_error(double local_error) const
