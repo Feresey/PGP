@@ -136,17 +136,15 @@ void Exchange::write_result(const std::string& output)
     MPI::Datatype pattern_type(string_type);
     // пусть строчки всегда будут по одной
     const std::vector<int> pattern_lens(size_t(n_outputs_per_block), 1);
-    std::vector<int> pattern_disps(static_cast<size_t>(n_outputs_per_block));
+    std::vector<MPI_Aint> pattern_disps(static_cast<size_t>(n_outputs_per_block));
 
     pattern_disps[0] = 0;
     for (int i = 1; i < n_outputs_per_block; ++i) {
-        pattern_disps[size_t(i)] = pattern_disps[size_t(i - 1)] + grid.n_blocks.x;
-        std::cerr << pattern_disps[size_t(i)] << " ";
+        pattern_disps[size_t(i)] = pattern_disps[size_t(i - 1)] + grid.n_blocks.x*str_size;
     }
-    std::cerr << std::endl;
 
     // ну оффсеты всегда кратны размеру string_type, так что хватило бы и MPI_Type_create_indexed.
-    pattern_type = pattern_type.Create_indexed(n_outputs_per_block, pattern_lens.data(), pattern_disps.data());
+    pattern_type = pattern_type.Create_hindexed(n_outputs_per_block, pattern_lens.data(), pattern_disps.data());
     pattern_type.Commit();
 
     std::string res(static_cast<size_t>(str_size * grid.bsize.y * grid.bsize.z + 1), ' ');
@@ -176,7 +174,6 @@ void Exchange::write_result(const std::string& output)
     MPI_Barrier(MPI_COMM_WORLD);
 
     MPI::File fd(fd.Open(MPI_COMM_WORLD, output.data(), MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL));
-    fd.Set_errhandler(MPI_ERRORS_ARE_FATAL);
 
     int y_stride = grid.bsize.x * grid.n_blocks.x;
     int z_stride = y_stride * grid.bsize.y * grid.n_blocks.y;
@@ -187,7 +184,7 @@ void Exchange::write_result(const std::string& output)
     int disp = (z_stride * global_z + y_stride * global_y + block_idx.x * grid.bsize.x) / grid.bsize.x * str_size;
     debug("write file with base offset %d.\n%s", disp, res.data());
     fd.Set_view(disp, string_type, pattern_type, "native", MPI_INFO_NULL);
-    fd.Set_size(0);
+    // fd.Set_size(0);
     MPI::Status status;
     fd.Write(res.data(), n_outputs_per_block, string_type, status);
     MPI_ERR(status.Get_error());
