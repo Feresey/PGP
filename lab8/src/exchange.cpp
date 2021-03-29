@@ -130,25 +130,23 @@ void Exchange::write_result(const std::string& output)
     MPI::Datatype string_type(MPI_CHAR);
     int len = snprintf(NULL, 0, "%e", double(0.0));
     int str_size = (len + 1) * grid.bsize.x;
-    string_type.Create_contiguous(str_size);
+    string_type = string_type.Create_contiguous(str_size);
     string_type.Commit();
 
     MPI::Datatype pattern_type(string_type);
     // пусть строчки всегда будут по одной
     const std::vector<int> pattern_lens(size_t(n_outputs_per_block), 1);
-    std::vector<MPI_Aint> pattern_disps(static_cast<size_t>(n_outputs_per_block));
+    std::vector<int> pattern_disps(static_cast<size_t>(n_outputs_per_block));
 
     pattern_disps[0] = 0;
     for (int i = 1; i < n_outputs_per_block; ++i) {
-        int increase = (i % grid.bsize.y != 0) ? grid.n_blocks.x
-                                               : grid.n_blocks.x * (grid.bsize.y * grid.n_blocks.y);
-        pattern_disps[size_t(i)] = pattern_disps[size_t(i - 1)] + increase*str_size;
+        pattern_disps[size_t(i)] = pattern_disps[size_t(i - 1)] + grid.n_blocks.x;
         std::cerr << pattern_disps[size_t(i)] << " ";
     }
     std::cerr << std::endl;
 
     // ну оффсеты всегда кратны размеру string_type, так что хватило бы и MPI_Type_create_indexed.
-    pattern_type.Create_hindexed(n_outputs_per_block, pattern_lens.data(), pattern_disps.data());
+    pattern_type = pattern_type.Create_indexed(n_outputs_per_block, pattern_lens.data(), pattern_disps.data());
     pattern_type.Commit();
 
     std::string res(static_cast<size_t>(str_size * grid.bsize.y * grid.bsize.z + 1), ' ');
@@ -189,8 +187,9 @@ void Exchange::write_result(const std::string& output)
     int disp = (z_stride * global_z + y_stride * global_y + block_idx.x * grid.bsize.x) / grid.bsize.x * str_size;
     debug("write file with base offset %d.\n%s", disp, res.data());
     fd.Set_view(disp, string_type, pattern_type, "native", MPI_INFO_NULL);
+    fd.Set_size(0);
     MPI::Status status;
-    fd.Write(res.data(), res.size(), string_type, status);
+    fd.Write(res.data(), n_outputs_per_block, string_type, status);
     MPI_ERR(status.Get_error());
 
     MPI_Barrier(MPI_COMM_WORLD);
