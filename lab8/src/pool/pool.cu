@@ -10,7 +10,6 @@ Device::Elem::Elem(const BlockGrid& grid)
     , DeviceKernels(grid)
 {
     const uint data_size = uint(grid.cells_per_block()) * sizeof(double);
-    debug("init gpu array with %d size", data_size);
     CUDA_ERR(cudaMalloc(&gpu_data, data_size));
     CUDA_ERR(cudaMalloc(&gpu_data_next, data_size));
 
@@ -20,7 +19,6 @@ Device::Elem::Elem(const BlockGrid& grid)
 
 Device::Elem::~Elem()
 {
-    debug("free array");
     CUDA_ERR(cudaFree(gpu_data));
     CUDA_ERR(cudaFree(gpu_data_next));
     CUDA_ERR(cudaFree(gpu_buffer));

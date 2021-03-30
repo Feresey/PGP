@@ -15,8 +15,7 @@
 #include "pool/task.hpp"
 #include "solver.hpp"
 
-int main(int argc, char** argv)
-{
+int main(int argc, char **argv) {
     MPI_ERR(MPI_Init(&argc, &argv));
     int rank, n_processes;
     MPI_ERR(MPI_Comm_rank(MPI_COMM_WORLD, &rank));
@@ -25,13 +24,12 @@ int main(int argc, char** argv)
 
     Grid grid(rank, n_processes);
     Task task;
-    std::string output;
-    std::cin
-        >> grid
-        >> output
-        >> task;
-
+    std::string output(PATH_MAX, '\0');
     if (rank == ROOT_RANK) {
+        std::cin >> grid;
+        output.resize(0);
+        std::cin >> output;
+        std::cin >> task;
         if (grid.n_blocks.x * grid.n_blocks.y * grid.n_blocks.z != n_processes) {
             std::cerr
                 << "incorrect block dimensions. actual " << grid.n_blocks.print("dim")
@@ -44,6 +42,7 @@ int main(int argc, char** argv)
     MPI_Barrier(MPI_COMM_WORLD);
 
     grid.mpi_bcast();
+    MPI_ERR(MPI_Bcast((void*)output.data(), PATH_MAX, MPI_CHAR, ROOT_RANK, MPI_COMM_WORLD));
     task.mpi_bcast();
 
     int n_devices;

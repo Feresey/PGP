@@ -6,7 +6,7 @@ SEND_DIR = $(CURDIR)/send
 $(CONVERT_TOOL):
 	cd $(dir $@) && go build -v
 
-TARGET = lab7
+TARGET = lab9
 TARGET_BIN = $(BINDIR)/$(TARGET)
 SEND_TARGET_DIR = $(SEND_DIR)/$(TARGET)
 
@@ -26,7 +26,7 @@ test: $(TARGET_BIN) | $(CONVERT_TOOL)
 .PHONY: send
 send: | $(SEND_DIR) $(SEND_TARGET_DIR)
 	mkdir -p $(SEND_TARGET_DIR)
-	$(MAKE) -C $(SRCDIR) copy DESTDIR=$(SEND_TARGET_DIR) TARGET=lab7
+	$(MAKE) -C $(SRCDIR) copy DESTDIR=$(SEND_TARGET_DIR) TARGET=$(TARGET)
 	cd $(SEND_DIR) && tar cvf $(TARGET).tar $(TARGET)
 	gpg -r 703FD5D038947C5B57CCE5A64DF7496E16FD3CBC -ab $(SEND_DIR)/$(TARGET).tar
 

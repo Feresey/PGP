@@ -22,8 +22,9 @@ double Problem::calc()
         1.0 / (height.z * height.z)
     };
 
+    auto& data = this->data;
+
     int n_threads = omp_get_max_threads();
-    std::cerr << "threads: " << n_threads << std::endl;
     for (int x = 0; x < grid.bsize.x; x += n_threads) {
         for (int y = 0; y < grid.bsize.y; y += n_threads) {
             for (int z = 0; z < grid.bsize.z; z += n_threads) {
@@ -61,7 +62,7 @@ double Problem::calc()
         }
     }
 
-    std::swap(data, data_next);
+    std::swap(this->data, this->data_next);
     return max_error;
 }
 
