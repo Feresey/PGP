@@ -15,7 +15,8 @@
 #include "pool/task.hpp"
 #include "solver.hpp"
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv)
+{
     MPI_ERR(MPI_Init(&argc, &argv));
     int rank, n_processes;
     MPI_ERR(MPI_Comm_rank(MPI_COMM_WORLD, &rank));
@@ -45,9 +46,15 @@ int main(int argc, char **argv) {
     MPI_ERR(MPI_Bcast((void*)output.data(), PATH_MAX, MPI_CHAR, ROOT_RANK, MPI_COMM_WORLD));
     task.mpi_bcast();
 
+    MPI_Comm local_comm;
+    int local_rank;
+    MPI_ERR(MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &local_comm));
+    MPI_ERR(MPI_Comm_rank(local_comm, &local_rank));
+    MPI_ERR(MPI_Comm_free(&local_comm));
+
     int n_devices;
     getDeviceCount(&n_devices);
-    setDevice(rank % n_devices);
+    setDevice(local_rank % n_devices);
 
     Device device = Device(grid, task);
     Solver solver(grid, task);
