@@ -142,7 +142,8 @@ void Exchange::write_result(const std::string& output)
 
     pattern_disps[0] = 0;
     for (int i = 1; i < n_outputs_per_block; ++i) {
-        pattern_disps[size_t(i)] = pattern_disps[size_t(i - 1)] + grid.n_blocks.x * str_size;
+        int increase = ((i % grid.bsize.y != 0) ? grid.n_blocks.x : grid.n_blocks.x + (grid.n_blocks.y - 1) * grid.n_blocks.x * grid.bsize.y);
+        pattern_disps[size_t(i)] = pattern_disps[size_t(i - 1)] + increase * str_size;
     }
 
     // ну оффсеты всегда кратны размеру string_type, так что хватило бы и MPI_Type_create_indexed.
