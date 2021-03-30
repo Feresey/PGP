@@ -59,11 +59,11 @@ int main(int argc, char** argv)
     Device device = Device(grid, task);
     Solver solver(grid, task);
 
-    std::cerr << solver << std::endl;
+    if (rank == ROOT_RANK) {
+        std::cerr << solver << std::endl;
+    }
 
-    debug("before solve");
     solver.solve(device, output);
-    debug("after solve");
 
     MPI_ERR(MPI_Finalize());
 }
