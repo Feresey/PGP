@@ -39,7 +39,159 @@
 
 \se{Метод решения}
 
-\se{Исходный код}
+Корневой процесс считывает условие задачи и при помощи \lstinline{MPI_Bcast} передаёт их
+остальным процессам.
+
+Вычисления проходят итеративно и состоят из следующих шагов:
+
+\begin{enumerate}
+	\item Обмен граничными слоями.
+	\item Пересчёт.
+	\item Вычисление погрешности.
+\end{enumerate}
+
+
+\subparagraph*{Обмен граничными слоями.}
+
+Так как вычисления происходят в разных процессах (возможно и на разных машинах),
+то им нужно обмениваться граничными значениями для вычисления следующей итерации.
+
+Для каждой их трёх координат происходит одни и те же операции для верхней и нижней границы.
+Каждый процесс передаёт свои граничные условия смежному процессу.
+
+Данные с границы записываются в отдельный буфер, который отправляется/принимается посредством \lstinline{MPI_ISend/MPI_IRecv}.
+
+Отличие этих функций от \lstinline{MPI_Send/MPI_Recv} в том, что они не блокирующие.
+Так в случае использования \lstinline{MPI_Send/MPI_Recv} пришлось бы явно разделить условия:
+
+\begin{lstlisting}[language=c++]
+if (current_rank == upper_process) {
+    MPI_Send(...);
+} else {
+    MPI_Recv(...);
+}
+
+if (current_rank == upper_process) {
+    MPI_Recv(...);
+} else {
+    MPI_Send(...);
+}
+\end{lstlisting}
+
+А при использовании \lstinline{MPI_ISend/MPI_IRecv} достаточно дождаться завершения обоих запросов.
+\begin{lstlisting}[language=c++]
+MPI_request req[2];
+MPI_Recv(..., &req[0]);
+MPI_Send(..., &req[1]);
+MPI_Waitall(2, req, ...);
+\end{lstlisting}
+
+От себя добавлю, что уже есть функция \lstinline{MPI_SendRecv}, которая делает то же самое, но в одну строчку.
+
+\subparagraph*{Пересчёт.}
+
+После обмена граничными условиями происходят основные вычисления.
+
+Для варианта с CUDA было нужно аккуратно использовать индексацию, чтобы доступ к памяти был последовательным.
+
+\begin{lstlisting}[language=c++,basicstyle=\scriptsize]
+__global__ void compute_kernel(
+    double* out, double* data,
+    BlockGrid grid,
+    mydim3<double> h)
+{
+    const int id_x = threadIdx.x + blockIdx.x * blockDim.x,
+              id_y = threadIdx.y + blockIdx.y * blockDim.y,
+              id_z = threadIdx.z + blockIdx.z * blockDim.z,
+              offset_x = blockDim.x * gridDim.x,
+              offset_y = blockDim.y * gridDim.y,
+              offset_z = blockDim.z * gridDim.z;
+
+    const double inv_hx = 1.0 / (h.x * h.x),
+                 inv_hy = 1.0 / (h.y * h.y),
+                 inv_hz = 1.0 / (h.z * h.z);
+
+    for (int i = id_x; i < grid.bsize.x; i += offset_x) {
+        for (int j = id_y; j < grid.bsize.y; j += offset_y) {
+            for (int k = id_z; k < grid.bsize.z; k += offset_z) {
+                double num = 0.0
+                    + (data[grid.cell_absolute_id(i + 1, j, k)] + data[grid.cell_absolute_id(i - 1, j, k)]) * inv_hx
+                    + (data[grid.cell_absolute_id(i, j + 1, k)] + data[grid.cell_absolute_id(i, j - 1, k)]) * inv_hy
+                    + (data[grid.cell_absolute_id(i, j, k + 1)] + data[grid.cell_absolute_id(i, j, k - 1)]) * inv_hz;
+                double denum = 2.0 * (inv_hx + inv_hy + inv_hz);
+
+                out[grid.cell_absolute_id(i, j, k)] = num / denum;
+            }
+        }
+    }
+}
+
+
+__global__ void abs_error_kernel(double* out, double* data, BlockGrid grid)
+{
+    const int idx = threadIdx.x + blockIdx.x * blockDim.x,
+              idy = threadIdx.y + blockIdx.y * blockDim.y,
+              idz = threadIdx.z + blockIdx.z * blockDim.z,
+              offset_x = blockDim.x * gridDim.x,
+              offset_y = blockDim.y * gridDim.y,
+              offset_z = blockDim.z * gridDim.z;
+
+    for (int i = idx - 1; i <= grid.bsize.x; i += offset_x) {
+        for (int j = idy - 1; j <= grid.bsize.y; j += offset_y) {
+            for (int k = idz - 1; k <= grid.bsize.z; k += offset_z) {
+                int cell_id = grid.cell_absolute_id(i, j, k);
+                if (i == -1 || j == -1 || k == -1
+                    || i == grid.bsize.x || j == grid.bsize.y || k == grid.bsize.z) {
+                    out[cell_id] = 0.0;
+                } else {
+                    out[cell_id] = fabsf(out[cell_id] - data[cell_id]);
+                }
+            }
+        }
+    }
+}
+
+double DeviceKernels::compute(double* out, double* data, mydim3<double> height)
+{
+    START_KERNEL((
+        compute_kernel<<<BORDER_DIMS_3D(kernel_block_dim, kernel_grid_dim)>>>(
+            out, data, grid, height)));
+
+    START_KERNEL((
+        abs_error_kernel<<<BORDER_DIMS_3D(kernel_block_dim, kernel_grid_dim)>>>(
+            data, out, grid)));
+
+    thrust::device_ptr<double> dev_ptr = thrust::device_pointer_cast(data);
+    double error = *thrust::max_element(dev_ptr, dev_ptr + grid.cells_per_block());
+
+    CUDA_ERR(cudaGetLastError());
+    return error;
+}
+\end{lstlisting}
+
+Для лабораторной с openmp я попытался создать сетку потоков ``a-la cuda'' и варп из нескольких процессов.
+
+\begin{lstlisting}
+
+\end{lstlisting}
+
+\subparagraph*{Вычисление погрешности.}
+
+С погрешностью всё довольно весело из за того что вычисления разделены на несколько процессов.
+
+И огромное счастье, что в MPI есть способ применить простую функцию к данным с нескольких процессов.
+
+\begin{lstlisting}[language=c++]
+double local_error = calc(...);
+double all_error;
+MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD));
+\end{lstlisting}
+
+Всем процессам вернётся максимальное число из ошибок всех процессов.
+
+Так можно определить условия окончания вычислений - достижение заданной погрешности.
+
+% \se{Исходный код}
 
 % \listsource{../src}{main.cpp}
 % \listsource{../src}{solver.hpp}
@@ -57,7 +209,5 @@
 \se{Результаты}
 
 \se{Выводы}
-
-Было интересно, но разрешать конфликты банков не очень весело.
 
 \end{document}
