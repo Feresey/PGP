@@ -184,7 +184,7 @@ void Exchange::write_result(const std::string& output)
     int disp = (z_stride * global_z + y_stride * global_y + block_idx.x * grid.bsize.x) / grid.bsize.x * str_size;
     debug("write file with base offset %d.", disp);
     MPI_ERR(MPI_File_set_view(fd, disp, string_type, pattern_type, "native", MPI_INFO_NULL));
-    MPI_ERR(MPI_File_set_size(fd, 0));
+    // MPI_ERR(MPI_File_set_size(fd, 0));
     MPI_ERR(MPI_File_write(fd, res.data(), n_outputs_per_block, string_type, MPI_STATUS_IGNORE));
     MPI_ERR(MPI_Barrier(MPI_COMM_WORLD));
 
