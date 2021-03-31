@@ -128,7 +128,8 @@ void Exchange::write_result(const std::string& output)
 
     // одна строчка по x координате
     MPI_Datatype string_type;
-    int str_size = 13 * grid.bsize.x + 1;
+    int len = snprintf(NULL, 0, "% e ", double(0.0));
+    int str_size = len * grid.bsize.x;
     MPI_ERR(MPI_Type_contiguous(str_size, MPI_CHAR, &string_type));
     MPI_ERR(MPI_Type_commit(&string_type));
 
@@ -147,24 +148,21 @@ void Exchange::write_result(const std::string& output)
     MPI_ERR(MPI_Type_create_hindexed(n_outputs_per_block, pattern_lens.data(), pattern_disps.data(), string_type, &pattern_type));
     MPI_ERR(MPI_Type_commit(&pattern_type));
 
-    std::string res(static_cast<size_t>(str_size * grid.bsize.y * grid.bsize.z + 1), ' ');
-    res.resize(0);
+    std::vector<char> res(static_cast<size_t>(str_size * grid.bsize.y * grid.bsize.z + 1), ' ');
 
     pool.load_gpu_data();
     for (int k = 0; k < grid.bsize.z; ++k) {
         for (int j = 0; j < grid.bsize.y; ++j) {
-            std::stringstream line;
-            line << std::scientific;
-            for (int i = 0; i < grid.bsize.x; ++i) {
-                line << pool.data[grid.cell_absolute_id(i, j, k)] << " ";
+            for (int i = 0; i < grid.bsize.x - 1; ++i) {
+                int offset = len * (i + grid.bsize.x * j + (grid.bsize.x * grid.bsize.y) * k);
+                sprintf(res.data() + offset, "% e ", pool.data[grid.cell_absolute_id(i, j, k)]);
             }
+            int offset = len * ((grid.bsize.x - 1) + grid.bsize.x * j + (grid.bsize.x * grid.bsize.y) * k);
             if (block_idx.x == (grid.n_blocks.x - 1)) {
-                line << "\n";
+                sprintf(res.data() + offset, "% e\n", pool.data[grid.cell_absolute_id(grid.bsize.x - 1, j, k)]);
             } else {
-                line << " ";
+                sprintf(res.data() + offset, "% e ", pool.data[grid.cell_absolute_id(grid.bsize.x - 1, j, k)]);
             }
-
-            res += line.str();
         }
     }
 
