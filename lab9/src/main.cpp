@@ -53,9 +53,5 @@ int main(int argc, char** argv)
 
     solver.solve(problem, output);
 
-    if (rank == ROOT_RANK) {
-        debug("done");
-    }
-
     MPI_ERR(MPI_Finalize());
 }

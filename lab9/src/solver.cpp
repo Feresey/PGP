@@ -24,7 +24,6 @@ void Solver::solve(Problem& problem, const std::string& output)
         double local_error = problem.calc();
         // exchange.write_result(std::cerr);
         error = this->calc_error(local_error);
-        // debug("after calc error: %e", local_error);
         // MPI_Abort(MPI_COMM_WORLD, MPI_ERR_ASSERT);
     }
     MPI_Barrier(MPI_COMM_WORLD);

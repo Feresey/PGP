@@ -25,11 +25,4 @@
 
 static const clock_t start_time = clock();
 
-#define debug(format, args...)                                                                                                                  \
-    do {                                                                                                                                        \
-        clock_t curr_time = clock();                                                                                                            \
-        fprintf(stderr, "%9.3f %s:%d\t" format "\n", static_cast<double>(curr_time - start_time) / CLOCKS_PER_SEC, __FILE__, __LINE__, ##args); \
-        fflush(stderr);                                                                                                                         \
-    } while (false)
-
 #endif

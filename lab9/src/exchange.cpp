@@ -154,7 +154,6 @@ void Exchange::write_result(const std::string& output)
 
     MPI_File fd;
     MPI_ERR(MPI_File_open(MPI_COMM_WORLD, output.data(), MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &fd));
-    debug("open file %s: %s", output.data(), strerror(errno));
 
     int y_stride = grid.bsize.x * grid.n_blocks.x;
     int z_stride = y_stride * grid.bsize.y * grid.n_blocks.y;
@@ -163,7 +162,6 @@ void Exchange::write_result(const std::string& output)
     int global_z = block_idx.z * grid.bsize.z;
 
     int disp = (z_stride * global_z + y_stride * global_y + block_idx.x * grid.bsize.x) / grid.bsize.x * str_size;
-    debug("write file with base offset %d.", disp);
     MPI_ERR(MPI_File_set_errhandler(fd, MPI_ERRORS_ARE_FATAL));
     MPI_ERR(MPI_File_set_view(fd, disp, string_type, pattern_type, "native", MPI_INFO_NULL));
     // MPI_ERR(MPI_File_set_size(fd, 0));
