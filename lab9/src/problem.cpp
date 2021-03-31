@@ -30,8 +30,7 @@ double Problem::calc()
             for (int z = 0; z < grid.bsize.z; z += n_threads) {
                 double error = 0.0;
 
-#pragma omp parallel num_threads(n_threads) shared(data) reduction(max \
-                                                                   : max_error)
+#pragma omp parallel num_threads(n_threads) shared(data) reduction(max:max_error)
                 {
                     int rank = omp_get_thread_num();
 

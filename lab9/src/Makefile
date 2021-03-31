@@ -65,7 +65,7 @@ TARGET_OBJECTS = $(CPP_OBJECTS)
 show:
 	@echo $(TARGET_OBJECTS)
 
-LDFLAGS = -lm -lmpi -lomp
+LDFLAGS = -lm -lmpi
 
 IFLAGS = -I. -fopenmp
 
