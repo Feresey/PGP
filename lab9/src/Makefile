@@ -19,9 +19,9 @@ $(DEPS_DIR) $(BUILDDIR) $(BINDIR):
 
 
 CPP_SOURCES = main.cpp grid/grid.cpp dim3/dim3.cpp \
-			solver.cpp common.cpp problem.cpp exchange.cpp
+			solver.cpp common.cpp problem.cpp exchange.cpp sides.cpp
 HEADERS     = helpers.hpp grid/grid.hpp dim3/dim3.hpp \
-			problem.hpp solver.hpp exchange.hpp
+			problem.hpp solver.hpp exchange.hpp sides.hpp
 
 SOURCES = $(CPP_SOURCES)
 
@@ -53,8 +53,8 @@ $(DEPS_LIST): $(DEPS_DIR)/%.mk: | $(DEPS_DIR)
 		xargs -n1 realpath --relative-to $(CURDIR)))
 
 .PHONY: deps.mk
-deps.mk: $(DEPS_LIST) | $(DEPS_DIR)
-	@cat $(sort $(DEPS_LIST)) > $@
+deps: $(DEPS_LIST) | $(DEPS_DIR)
+	@cat $(sort $(DEPS_LIST)) > deps.mk
 
 -include deps.mk
 
@@ -76,7 +76,8 @@ CFLAGS = -W -Wall -Wextra -Wpedantic \
 		-Wctor-dtor-privacy -Wnon-virtual-dtor \
 		-Wold-style-cast \
 		-Wunreachable-code -fstack-protector \
-		--std=c++14
+		--std=c++14 \
+		-Wno-variadic-macros
 
 ifeq ($(BENCH),on)
 CFLAGS = -O3

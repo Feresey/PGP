@@ -24,16 +24,12 @@ void Solver::solve(Problem& problem, const std::string& output)
         double local_error = problem.calc();
         // exchange.write_result(std::cerr);
         error = this->calc_error(local_error);
+        // debug("after calc error: %e", local_error);
         // MPI_Abort(MPI_COMM_WORLD, MPI_ERR_ASSERT);
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    if (grid.process_rank == ROOT_RANK) {
-        std::fstream out(output, out.trunc | out.out);
-        exchange.write_result(out);
-    } else {
-        exchange.send_result();
-    }
+    exchange.write_result(output);
 }
 
 double Solver::calc_error(double local_error) const

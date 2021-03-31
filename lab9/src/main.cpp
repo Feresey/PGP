@@ -23,13 +23,12 @@ int main(int argc, char** argv)
 
     Grid grid(rank, n_processes);
     Task task;
-    std::string output;
-    std::cin
-        >> grid
-        >> output
-        >> task;
-
+    std::string output(PATH_MAX, '\0');
     if (rank == ROOT_RANK) {
+        std::cin >> grid;
+        output.resize(0);
+        std::cin >> output;
+        std::cin >> task;
         if (grid.n_blocks.x * grid.n_blocks.y * grid.n_blocks.z != n_processes) {
             std::cerr
                 << "incorrect block dimensions. actual " << grid.n_blocks.print("dim")
@@ -42,16 +41,21 @@ int main(int argc, char** argv)
     MPI_Barrier(MPI_COMM_WORLD);
 
     grid.mpi_bcast();
+    MPI_ERR(MPI_Bcast(&output[0], PATH_MAX, MPI_CHAR, ROOT_RANK, MPI_COMM_WORLD));
     task.mpi_bcast();
 
     Problem problem(task, grid);
     Solver solver(grid, task);
 
-    std::cout << solver << std::endl;
-
-    std::cout.flush();
+    if (rank == ROOT_RANK) {
+        std::cerr << solver << std::endl;
+    }
 
     solver.solve(problem, output);
+
+    if (rank == ROOT_RANK) {
+        debug("done");
+    }
 
     MPI_ERR(MPI_Finalize());
 }

@@ -1,5 +1,9 @@
+#include <cmath>
+#include <sstream>
+
 #include "exchange.hpp"
 #include "helpers.hpp"
+#include "sides.hpp"
 
 Exchange::Exchange(const Grid& grid, const Task& task, Problem& problem)
     : grid(grid)
@@ -9,18 +13,9 @@ Exchange::Exchange(const Grid& grid, const Task& task, Problem& problem)
     //@ да, так будет оверхед по памяти, но не нужно мучиться с границами.@
     const int max_dim = grid.max_size();
 
-    this->send_buffer = std::vector<double>(static_cast<size_t>(max_dim * max_dim + 2));
-    this->receive_buffer = std::vector<double>(static_cast<size_t>(max_dim * max_dim + 2));
+    this->send_buffer = std::vector<double>(static_cast<size_t>(max_dim * max_dim));
+    this->receive_buffer = std::vector<double>(static_cast<size_t>(max_dim * max_dim));
 }
-
-enum {
-    LEFT,
-    RIGHT,
-    FRONT,
-    BACK,
-    TOP,
-    BOTTOM
-};
 
 void Exchange::exchange2D(
     const int block_idx, const int n_blocks, const int cell_size,
@@ -111,57 +106,71 @@ void Exchange::boundary_layer_exchange()
         });
 }
 
-void Exchange::write_layer(int j, int k, int block_idx, std::ostream& out)
+void Exchange::write_result(const std::string& output)
 {
-    if (block_idx == 0) {
-        for (int i = 0; i < grid.bsize.x; ++i) {
-            receive_buffer[size_t(i)] = problem.data[grid.cell_absolute_id(i, j, k)];
-        }
-    } else {
-        int tag = k * grid.bsize.z + j;
-        MPI_ERR(MPI_Recv(receive_buffer.data(), grid.bsize.x, MPI_DOUBLE, block_idx, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE));
+    int n_outputs_per_block = grid.bsize.y * grid.bsize.z;
+    dim3<int> block_idx = grid.block_idx();
+
+    // одна строчка по x координате
+    MPI_Datatype string_type;
+    int len = snprintf(NULL, 0, "% e ", double(0.0));
+    int str_size = len * grid.bsize.x;
+    MPI_ERR(MPI_Type_contiguous(str_size, MPI_CHAR, &string_type));
+    MPI_ERR(MPI_Type_commit(&string_type));
+
+    MPI_Datatype pattern_type;
+    // пусть строчки всегда будут по одной
+    const std::vector<int> pattern_lens(size_t(n_outputs_per_block), 1);
+    std::vector<MPI_Aint> pattern_disps(static_cast<size_t>(n_outputs_per_block));
+
+    pattern_disps[0] = 0;
+    for (int i = 1; i < n_outputs_per_block; ++i) {
+        int increase = ((i % grid.bsize.y != 0) ? grid.n_blocks.x : (grid.n_blocks.x + (grid.n_blocks.y - 1) * grid.n_blocks.x * grid.bsize.y));
+        pattern_disps[size_t(i)] = pattern_disps[size_t(i - 1)] + increase * str_size;
     }
 
-    for (int i = 0; i < grid.bsize.x; ++i) {
-        if (i != 0) {
-            out << " ";
-        }
-        out << receive_buffer[size_t(i)];
-    }
-}
+    // ну оффсеты всегда кратны размеру string_type, так что хватило бы и MPI_Type_create_indexed.
+    MPI_ERR(MPI_Type_create_hindexed(n_outputs_per_block, pattern_lens.data(), pattern_disps.data(), string_type, &pattern_type));
+    MPI_ERR(MPI_Type_commit(&pattern_type));
 
-void Exchange::write_result(std::ostream& out)
-{
-    out << std::scientific;
+    std::vector<char> res(static_cast<size_t>(str_size * grid.bsize.y * grid.bsize.z + 1), ' ');
 
-    for (int bk = 0; bk < grid.n_blocks.z; ++bk) {
-        for (int k = 0; k < grid.bsize.z; ++k) {
-            for (int bj = 0; bj < grid.n_blocks.y; ++bj) {
-                for (int j = 0; j < grid.bsize.y; ++j) {
-                    for (int bi = 0; bi < grid.n_blocks.x; ++bi) {
-                        int block_idx = grid.block_absolute_id(bi, bj, bk);
-                        if (bi != 0) {
-                            out << " ";
-                        }
-                        this->write_layer(j, k, block_idx, out);
-                    }
-                    out << std::endl;
-                }
-            }
-            out << std::endl;
-        }
-    }
-}
-
-void Exchange::send_result()
-{
     for (int k = 0; k < grid.bsize.z; ++k) {
         for (int j = 0; j < grid.bsize.y; ++j) {
-            for (int i = 0; i < grid.bsize.x; ++i) {
-                send_buffer[size_t(i)] = problem.data[grid.cell_absolute_id(i, j, k)];
+            for (int i = 0; i < grid.bsize.x - 1; ++i) {
+                int offset = len * (i + grid.bsize.x * j + (grid.bsize.x * grid.bsize.y) * k);
+                sprintf(res.data() + offset, "% e ", problem.data[grid.cell_absolute_id(i, j, k)]);
             }
-            int tag = k * grid.bsize.z + j;
-            MPI_Send(send_buffer.data(), grid.bsize.x, MPI_DOUBLE, ROOT_RANK, tag, MPI_COMM_WORLD);
+            int offset = len * ((grid.bsize.x - 1) + grid.bsize.x * j + (grid.bsize.x * grid.bsize.y) * k);
+            if (block_idx.x == (grid.n_blocks.x - 1)) {
+                sprintf(res.data() + offset, "% e\n", problem.data[grid.cell_absolute_id(grid.bsize.x - 1, j, k)]);
+            } else {
+                sprintf(res.data() + offset, "% e ", problem.data[grid.cell_absolute_id(grid.bsize.x - 1, j, k)]);
+            }
         }
     }
+
+    MPI_ERR(MPI_Barrier(MPI_COMM_WORLD));
+
+    MPI_File fd;
+    MPI_ERR(MPI_File_open(MPI_COMM_WORLD, output.data(), MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &fd));
+    debug("open file %s: %s", output.data(), strerror(errno));
+
+    int y_stride = grid.bsize.x * grid.n_blocks.x;
+    int z_stride = y_stride * grid.bsize.y * grid.n_blocks.y;
+
+    int global_y = block_idx.y * grid.bsize.y;
+    int global_z = block_idx.z * grid.bsize.z;
+
+    int disp = (z_stride * global_z + y_stride * global_y + block_idx.x * grid.bsize.x) / grid.bsize.x * str_size;
+    debug("write file with base offset %d.", disp);
+    MPI_ERR(MPI_File_set_errhandler(fd, MPI_ERRORS_ARE_FATAL));
+    MPI_ERR(MPI_File_set_view(fd, disp, string_type, pattern_type, "native", MPI_INFO_NULL));
+    // MPI_ERR(MPI_File_set_size(fd, 0));
+    MPI_ERR(MPI_File_write(fd, res.data(), n_outputs_per_block, string_type, MPI_STATUS_IGNORE));
+    MPI_ERR(MPI_Barrier(MPI_COMM_WORLD));
+
+    MPI_ERR(MPI_File_close(&fd));
+    MPI_ERR(MPI_Type_free(&string_type));
+    MPI_ERR(MPI_Type_free(&pattern_type));
 }
