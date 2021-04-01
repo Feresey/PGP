@@ -7,10 +7,10 @@ Exchange::Exchange(const Grid& grid, const Task& task, Problem& problem)
     , problem(problem)
 {
     //@ да, так будет оверхед по памяти, но не нужно мучиться с границами.@
-    const int max_dim = grid.max_size();
+    const int max_dim = grid.max_size() + 2;
 
-    this->send_buffer = std::vector<double>(static_cast<size_t>(max_dim * max_dim + 2));
-    this->receive_buffer = std::vector<double>(static_cast<size_t>(max_dim * max_dim + 2));
+    this->send_buffer = std::vector<double>(static_cast<size_t>(max_dim * max_dim));
+    this->receive_buffer = std::vector<double>(static_cast<size_t>(max_dim * max_dim));
 }
 
 enum {

@@ -13,6 +13,27 @@
 #include "helpers.hpp"
 #include "solver.hpp"
 
+#include <time.h>
+
+// call this function to start a nanosecond-resolution timer
+struct timespec timer_start()
+{
+    struct timespec start_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start_time);
+    return start_time;
+}
+
+typedef unsigned long long ull;
+
+// call this function to end a timer, returning nanoseconds elapsed as a long
+ull timer_end(struct timespec start_time)
+{
+    struct timespec end_time;
+    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &end_time);
+    ull diffInNanos = (ull)(end_time.tv_sec - start_time.tv_sec) * (ull)1e9 + (ull)(end_time.tv_nsec - start_time.tv_nsec);
+    return diffInNanos;
+}
+
 int main(int argc, char** argv)
 {
     MPI_ERR(MPI_Init(&argc, &argv));
@@ -51,7 +72,12 @@ int main(int argc, char** argv)
 
     std::cout.flush();
 
+    struct timespec start_time = timer_start();
     solver.solve(problem, output);
+    ull res = timer_end(start_time);
+    if (rank == ROOT_RANK) {
+        std::cerr << res << std::endl;
+    }
 
     MPI_ERR(MPI_Finalize());
 }

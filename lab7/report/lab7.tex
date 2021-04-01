@@ -1,6 +1,7 @@
 \documentclass[12pt]{article}
 
 \usepackage{amsmath}
+\usepackage{tabularx}
 
 
 \input{../../tex/preamble.tex}
@@ -189,7 +190,7 @@ MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM
 
 Всем процессам вернётся максимальное число из ошибок всех процессов.
 
-Так можно определить условия окончания вычислений - достижение заданной погрешности.
+Так можно определить условие окончания вычислений - достижение заданной погрешности.
 
 % \se{Исходный код}
 
@@ -207,6 +208,60 @@ MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM
 % \listsource{../src}{dim3/dim3.cpp}
 
 \se{Результаты}
+\noindent
+\begin{table*}[!htb]
+	\begin{minipage}{.49\linewidth}
+		\centering
+		\caption*{Область 8x8x8}
+		точность $1e^{-10}$
+		\begin{tabularx}{\linewidth}{|X|X|}
+			\hline
+			n processes & time      \\
+			\hline
+			1           & 21.607302 \\
+			2           & 18.843787 \\
+			4           & 14.497888 \\
+			8           & 35.551439 \\
+			16          & 98.548130 \\
+			\hline
+		\end{tabularx}
+	\end{minipage}%
+	\begin{minipage}{.49\linewidth}
+		\centering
+		\caption*{Область 64x64x64}
+		точность $1e^{-2}$
+		\begin{tabularx}{\linewidth}{|X|X|}
+			\hline
+			n processes & time        \\
+			\hline
+			1           & 6968.731496 \\
+			2           & 4522.690277 \\
+			4           & 2542.007506 \\
+			8           & 2081.170354 \\
+			16          & 795.745062  \\
+			32          & 616.174570  \\
+			\hline
+		\end{tabularx}
+	\end{minipage}
+
+	\begin{minipage}{.49\linewidth}
+		\centering
+		\caption*{Область 128x128x128}
+		точность $1e^{-2}$
+		\begin{tabularx}{\linewidth}{|X|X|}
+			\hline
+			n processes & time        \\
+			\hline
+			1           & 45277053369 \\
+			2           & 49619365214 \\
+			4           & 20064615792 \\
+			8           & 8796538972 \\
+			16          &  \\
+			32          &  \\
+			\hline
+		\end{tabularx}
+	\end{minipage}%
+\end{table*}
 
 \se{Выводы}
 

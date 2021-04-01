@@ -3,7 +3,7 @@
 
 #define ROOT_RANK 0
 
-#define MPI_ERR(call)                                            \
+#define MPI_ERR(call)                                        \
     do {                                                     \
         int err = (call);                                    \
         if (err != MPI_SUCCESS) {                            \
