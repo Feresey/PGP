@@ -34,7 +34,7 @@ class Device {
 
         double calculate(mydim3<double> height);
 
-        Elem(const BlockGrid& grid);
+        Elem(const BlockGrid& grid, int kernel_grid_dim, int kernel_block_dim);
         ~Elem();
     };
 

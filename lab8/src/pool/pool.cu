@@ -5,9 +5,9 @@
 
 #include <cassert>
 
-Device::Elem::Elem(const BlockGrid& grid)
+Device::Elem::Elem(const BlockGrid& grid, int kernel_grid_dim, int kernel_block_dim)
     : grid(grid)
-    , DeviceKernels(grid)
+    , DeviceKernels(grid, kernel_grid_dim, kernel_block_dim)
 {
     const uint data_size = uint(grid.cells_per_block()) * sizeof(double);
     debug("init gpu array with %d size", data_size);

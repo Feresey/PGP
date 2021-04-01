@@ -137,10 +137,10 @@ __global__ void abs_error_kernel(double* out, double* data, BlockGrid grid)
 
 /* CXX API */
 
-DeviceKernels::DeviceKernels(BlockGrid grid, int kernel_grid_dim, int kernel_block_dim)
+DeviceKernels::DeviceKernels(BlockGrid grid, int kernel_block_dim, int kernel_grid_dim)
     : grid(grid)
-    , kernel_grid_dim(kernel_grid_dim)
     , kernel_block_dim(kernel_block_dim)
+    , kernel_grid_dim(kernel_grid_dim)
 {
 }
 

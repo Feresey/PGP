@@ -28,7 +28,7 @@ layer_tag side_tag_to_layer_tag(side_tag tag);
 
 class DeviceKernels {
     BlockGrid grid;
-    int kernel_grid_dim, kernel_block_dim;
+    int kernel_block_dim, kernel_grid_dim;
 
 protected:
     void get_border(
