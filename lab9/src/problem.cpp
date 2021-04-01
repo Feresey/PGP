@@ -24,15 +24,15 @@ double Problem::calc()
 
     auto& data = this->data;
 
-    int n_threads = omp_get_max_threads();
-    for (int x = 0; x < grid.bsize.x; x += n_threads) {
-        for (int y = 0; y < grid.bsize.y; y += n_threads) {
-            for (int z = 0; z < grid.bsize.z; z += n_threads) {
-                double error = 0.0;
+#pragma omp parallel shared(data) reduction(max:max_error)
+    {
+        int n_threads = omp_get_num_threads();
+        int rank = omp_get_thread_num();
 
-#pragma omp parallel num_threads(n_threads) shared(data) reduction(max:max_error)
-                {
-                    int rank = omp_get_thread_num();
+        for (int x = 0; x < grid.bsize.x; x += n_threads) {
+            for (int y = 0; y < grid.bsize.y; y += n_threads) {
+                for (int z = 0; z < grid.bsize.z; z += n_threads) {
+                    double error = 0.0;
 
                     for (int bx = 0; bx < n_threads; ++bx) {
                         for (int by = 0; by < n_threads; ++by) {
