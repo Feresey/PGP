@@ -33,7 +33,7 @@ Device::Device(const Grid& grid, Task task)
     : grid(grid)
     , height(grid.height(task.l_size))
     , task(task)
-    , device(grid, 2, 8)
+    , device(grid, 32, 8)
     , data(grid.cells_per_block(), task.u_0)
 {
     device.store_data(data);
