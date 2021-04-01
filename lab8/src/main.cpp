@@ -15,6 +15,8 @@
 #include "pool/task.hpp"
 #include "solver.hpp"
 
+#include <chrono>
+
 int main(int argc, char** argv)
 {
     MPI_ERR(MPI_Init(&argc, &argv));
@@ -63,7 +65,14 @@ int main(int argc, char** argv)
         std::cerr << solver << std::endl;
     }
 
+    using scl = std::chrono::system_clock;
+    auto start = scl::now();
     solver.solve(device, output);
+    if (rank == ROOT_RANK) {
+        auto end = scl::now();
+        std::chrono::duration<double> secs = end - start;
+        std::cerr << secs.count() * 1000.0 << std::endl;
+    }
 
     MPI_ERR(MPI_Finalize());
 }
