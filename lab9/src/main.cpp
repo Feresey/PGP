@@ -13,6 +13,8 @@
 #include "helpers.hpp"
 #include "solver.hpp"
 
+#include <chrono>
+
 int main(int argc, char** argv)
 {
     MPI_ERR(MPI_Init(&argc, &argv));
@@ -51,7 +53,12 @@ int main(int argc, char** argv)
         std::cerr << solver << std::endl;
     }
 
+    auto start = std::chrono::system_clock::now();
     solver.solve(problem, output);
-
+    if (rank == ROOT_RANK) {
+        auto end = std::chrono::system_clock::now();
+        std::chrono::duration<double> seconds = end - start;
+        std::cerr << seconds.count() * 1000.0 << std::endl;
+    }
     MPI_ERR(MPI_Finalize());
 }
