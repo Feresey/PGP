@@ -269,8 +269,7 @@ MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1,
 \begin{table*}[!ht]
 	\begin{minipage}{.49\linewidth}
 		\centering
-		\caption*{Область 8x8x8}
-		точность $1e^{-10}$
+		\caption*{Область 8x8x8, точность $1e^{-10}$}
 		\begin{tabularx}{\linewidth}{|X|X|}
 			\hline
 			n processes & time      \\
@@ -285,8 +284,7 @@ MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1,
 	\end{minipage}%
 	\begin{minipage}{.49\linewidth}
 		\centering
-		\caption*{Область 64x64x64}
-		точность $1e^{-2}$
+		\caption*{Область 64x64x64, точность $1e^{-2}$}
 		\begin{tabularx}{\linewidth}{|X|X|}
 			\hline
 			n processes & time        \\
@@ -302,8 +300,7 @@ MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1,
 
 	\begin{minipage}{.49\linewidth}
 		\centering
-		\caption*{Область 128x128x128}
-		точность $1e^{-2}$
+		\caption*{Область 128x128x128, точность $1e^{-2}$}
 		\begin{tabularx}{\linewidth}{|X|X|}
 			\hline
 			n processes & time         \\
@@ -331,30 +328,55 @@ MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1,
 Но есть смысл подобрать параметры запуска ядра для различных данных
 
 \begin{table*}[!ht]
-	\centering
 	\caption*{Параметры запуска и время выполнения}
-	точность $1e^{-10}$
-	\begin{tabularx}{\linewidth}{|X|X|X|}
-		\hline
-		grid & block & time \\
-		\hline
-		% 1 &8& 
-		\hline
-	\end{tabularx}
+	\begin{minipage}{.49\linewidth}
+		\caption*{задача 8x8x8, точность $1e^{-10}$}
+		\begin{tabularx}{\linewidth}{|X|X|}
+			\hline
+			grid x block & time    \\
+			\hline
+			1x8          & 520.337 \\
+			2x8          & 517.431 \\
+			4x8          & 532.226 \\
+			8x8          & 645.553 \\
+			16x8         & 1519.72 \\
+			32x8         & 8431.02 \\
+			\hline
+		\end{tabularx}
+	\end{minipage}%
+	\begin{minipage}{.49\linewidth}
+		\caption*{задача 128x128x128, точность $1e^{-2}$}
+		\begin{tabularx}{\linewidth}{|X|X|}
+			\hline
+			grid x block & time    \\
+			\hline
+			1x8          & 7685.53 \\
+			2x8          & 5110.21 \\
+			4x8          & 5239.2  \\
+			8x8          & 4986.23 \\
+			16x8         & 5569.74 \\
+			32x8         & 11806.7 \\
+			\hline
+		\end{tabularx}
+	\end{minipage}
 \end{table*}
 
+Тут очевидно что у параметров 2x8 наилучшее время.
 
-\textit{Область 8x8x8}:
-\textit{Область 64x64x64}:
-\textit{Область 128x128x128}:
+\textit{Область 8x8x8}: 517.431
+\textit{Область 64x64x64}: 3335.12
+\textit{Область 128x128x128}: 4986.23
+
+При сравнении с ЛР №7 реализация с CUDA выиграла только на больших данных,
+что и ожидалось. На маленьких же и средних данных получилось в сотни раз менее эффективно
+чем реализация на CPU.
 
 \textbf{ЛР №9}
 
 \begin{table*}[!ht]
 	\begin{minipage}{.49\linewidth}
 		\centering
-		\caption*{Область 8x8x8}
-		точность $1e^{-10}$
+		\caption*{Область 8x8x8, точность $1e^{-10}$}
 		\begin{tabularx}{\linewidth}{|X|X|}
 			\hline
 			n processes & time     \\
@@ -369,8 +391,7 @@ MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1,
 	\end{minipage}%
 	\begin{minipage}{.49\linewidth}
 		\centering
-		\caption*{Область 64x64x64}
-		точность $1e^{-2}$
+		\caption*{Область 64x64x64, точность $1e^{-2}$}
 		\begin{tabularx}{\linewidth}{|X|X|}
 			\hline
 			n processes & time    \\
@@ -388,8 +409,7 @@ MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1,
 
 	\begin{minipage}{.49\linewidth}
 		\centering
-		\caption*{Область 128x128x128}
-		точность $1e^{-2}$
+		\caption*{Область 128x128x128, точность $1e^{-2}$}
 		\begin{tabularx}{\linewidth}{|X|X|}
 			\hline
 			n processes & time    \\
@@ -414,5 +434,39 @@ MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1,
 Скорее всего OpenMP мог бы показать себя лучше если бы у меня было больше ядер процессора.
 
 \se{Выводы}
+
+Задача ``о кирпиче и утюгах'' успешно решена.
+
+С помощью MPI решение задачи было довольно просто разбить на несколько процессов
+(просто по сравнению с ручным обменом данными через gRPC, IPC или TCP).
+Всё же интерфейс не очень удобен для людей, отчасти потому что он рассчитан на C и Fortran.
+Но раз уж это стандарт, то это допустимо.
+
+Особенно радует поведение \lstinline{MPI_Barrier}, который грузит на 100\% ядро, пока ждёт другие процессы.
+Так же логика работы с ошибками традиционна плоха для C и в MPI это особенно заметно,
+даже не смотря на огромное количество кодов ошибок.
+
+Ошибки коммуникации требуют отдельного отчёта, так как дедлоки и \\
+\lstinline{MPI_ERR_MESSAGE_TRUNCATED} не очень помогают при отладке.
+
+\textbf{ЛР №7}
+Больше всего труда потребовалось на написание логики обмена граничными
+условниями. Даже с собиранием результата было проще.
+
+\textbf{ЛР №8}
+Мне было бы намного проще жить, если бы я сразу понял что не нужно самому дробить данные и создавать пул GPU.
+Создание локального коммуникатора для выбора GPU сэкономило мне множество нервных клеток.
+
+\textbf{ЛР №9}
+Не мог не заметить что на чекере тесты для всех трёх лаботаторных примерно одинаковые,
+потому что 76 активных процессов на машине с 8 ядрами явно намекают на неправильную конфигурацию.
+
+Об OpenMP осталось двоякое впечатление.
+
+С одной стороны это довольно удобно одной строчкой распараллеливать код.
+Но впечатлить это может только человека который писал на Си.
+
+В тех же Go и Rust нет проблем распараллелить программу. Конечно это будет не одна строчка, но преимущество в том,
+что это часть самого языка, а не расширение компилятора.
 
 \end{document}
