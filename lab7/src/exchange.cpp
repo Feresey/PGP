@@ -165,7 +165,7 @@ void Exchange::send_result()
                 send_buffer[size_t(i)] = problem.data[grid.cell_absolute_id(i, j, k)];
             }
             int tag = k * grid.bsize.z + j;
-            MPI_Send(send_buffer.data(), grid.bsize.x, MPI_DOUBLE, ROOT_RANK, tag, MPI_COMM_WORLD);
+            MPI_ERR(MPI_Send(send_buffer.data(), grid.bsize.x, MPI_DOUBLE, ROOT_RANK, tag, MPI_COMM_WORLD));
         }
     }
 }

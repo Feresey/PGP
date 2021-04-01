@@ -172,8 +172,59 @@ double DeviceKernels::compute(double* out, double* data, mydim3<double> height)
 
 Для лабораторной с openmp я попытался создать сетку потоков ``a-la cuda'' и варп из нескольких процессов.
 
-\begin{lstlisting}
+\begin{lstlisting}[language=c++,basicstyle=\scriptsize]
+double Problem::calc()
+{
+    double max_error = 0.0;
 
+    const dim3<double> inv_h = {
+        1.0 / (height.x * height.x),
+        1.0 / (height.y * height.y),
+        1.0 / (height.z * height.z)
+    };
+
+    auto& data = this->data;
+
+#pragma omp parallel shared(data) reduction(max:max_error)
+    {
+        int n_threads = omp_get_num_threads();
+        int rank = omp_get_thread_num();
+
+        for (int x = 0; x < grid.bsize.x; x += n_threads) {
+            for (int y = 0; y < grid.bsize.y; y += n_threads) {
+                for (int z = 0; z < grid.bsize.z; z += n_threads) {
+                    double error = 0.0;
+
+                    for (int bx = 0; bx < n_threads; ++bx) {
+                        for (int by = 0; by < n_threads; ++by) {
+                            int i = x + bx, j = y + by, k = z + rank;
+                            if (i >= grid.bsize.x || j >= grid.bsize.y || k >= grid.bsize.z) {
+                                continue;
+                            }
+                            double num = 0.0
+                                + (data[grid.cell_absolute_id(i + 1, j, k)] + data[grid.cell_absolute_id(i - 1, j, k)]) * inv_h.x
+                                + (data[grid.cell_absolute_id(i, j + 1, k)] + data[grid.cell_absolute_id(i, j - 1, k)]) * inv_h.y
+                                + (data[grid.cell_absolute_id(i, j, k + 1)] + data[grid.cell_absolute_id(i, j, k - 1)]) * inv_h.z;
+
+                            double denum = 2.0 * (inv_h.x + inv_h.y + inv_h.z);
+                            double temp = num / denum;
+                            error = std::fabs(data[grid.cell_absolute_id(i, j, k)] - temp);
+
+                            if (error > max_error) {
+                                max_error = error;
+                            }
+
+                            data_next[grid.cell_absolute_id(i, j, k)] = temp;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    std::swap(this->data, this->data_next);
+    return max_error;
+}
 \end{lstlisting}
 
 \subparagraph*{Вычисление погрешности.}
@@ -185,7 +236,8 @@ double DeviceKernels::compute(double* out, double* data, mydim3<double> height)
 \begin{lstlisting}[language=c++]
 double local_error = calc(...);
 double all_error;
-MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD));
+MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1,
+                      MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD));
 \end{lstlisting}
 
 Всем процессам вернётся максимальное число из ошибок всех процессов.
@@ -207,9 +259,14 @@ MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM
 % \listsource{../src}{dim3/dim3.hpp}
 % \listsource{../src}{dim3/dim3.cpp}
 
+\newpage
+
 \se{Результаты}
+
 \noindent
-\begin{table*}[!htb]
+\textbf{ЛР №7}
+
+\begin{table*}[!ht]
 	\begin{minipage}{.49\linewidth}
 		\centering
 		\caption*{Область 8x8x8}
@@ -218,11 +275,11 @@ MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM
 			\hline
 			n processes & time      \\
 			\hline
-			1           & 21.607302 \\
-			2           & 18.843787 \\
-			4           & 14.497888 \\
-			8           & 35.551439 \\
-			16          & 98.548130 \\
+			1           & 5.053358  \\
+			2           & 4.285806  \\
+			4           & 5.089221  \\
+			8           & 7.661748  \\
+			16          & 33.624588 \\
 			\hline
 		\end{tabularx}
 	\end{minipage}%
@@ -234,12 +291,11 @@ MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM
 			\hline
 			n processes & time        \\
 			\hline
-			1           & 6968.731496 \\
-			2           & 4522.690277 \\
-			4           & 2542.007506 \\
-			8           & 2081.170354 \\
-			16          & 795.745062  \\
-			32          & 616.174570  \\
+			1           & 1839.555659 \\
+			2           & 945.581431  \\
+			4           & 463.531061  \\
+			8           & 270.607518  \\
+			16          & 252.518910  \\
 			\hline
 		\end{tabularx}
 	\end{minipage}
@@ -250,18 +306,112 @@ MPI_ERR(MPI_Allreduce(&local_error, &all_error, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM
 		точность $1e^{-2}$
 		\begin{tabularx}{\linewidth}{|X|X|}
 			\hline
-			n processes & time        \\
+			n processes & time         \\
 			\hline
-			1           & 45277053369 \\
-			2           & 49619365214 \\
-			4           & 20064615792 \\
-			8           & 8796538972 \\
-			16          &  \\
-			32          &  \\
+			1           & 15037.712376 \\
+			2           & 7891.283137  \\
+			4           & 3890.322194  \\
+			8           & 2298.152495  \\
+			16          & 1980.277726  \\
 			\hline
 		\end{tabularx}
 	\end{minipage}%
 \end{table*}
+
+По первой таблице видно, что на большем количестве потоков результат стал хуже,
+так как больше времени заняла передача граничных условий, чем сами вычисления.
+
+На большем количестве данных скорость вычисления растёт с повышением числа процессов.
+
+\textbf{ЛР №8}
+
+При работе с CUDA получается не очень эффективно делать маленькие задачи и много процессов,
+так как подготовка к вычислениям занимает намного больше времени.
+
+Но есть смысл подобрать параметры запуска ядра для различных данных
+
+\begin{table*}[!ht]
+	\centering
+	\caption*{Параметры запуска и время выполнения}
+	точность $1e^{-10}$
+	\begin{tabularx}{\linewidth}{|X|X|X|}
+		\hline
+		grid & block & time \\
+		\hline
+		% 1 &8& 
+		\hline
+	\end{tabularx}
+\end{table*}
+
+
+\textit{Область 8x8x8}:
+\textit{Область 64x64x64}:
+\textit{Область 128x128x128}:
+
+\textbf{ЛР №9}
+
+\begin{table*}[!ht]
+	\begin{minipage}{.49\linewidth}
+		\centering
+		\caption*{Область 8x8x8}
+		точность $1e^{-10}$
+		\begin{tabularx}{\linewidth}{|X|X|}
+			\hline
+			n processes & time     \\
+			\hline
+			1           & 5.00552  \\
+			2           & 4.17633  \\
+			4           & 12685.4  \\
+			8           & 27266.4  \\
+			16          & 362840.0 \\
+			\hline
+		\end{tabularx}
+	\end{minipage}%
+	\begin{minipage}{.49\linewidth}
+		\centering
+		\caption*{Область 64x64x64}
+		точность $1e^{-2}$
+		\begin{tabularx}{\linewidth}{|X|X|}
+			\hline
+			n processes & time    \\
+			\hline
+			1           & 1348.7  \\
+			2           & 688.18  \\
+			4           & 11077.1 \\
+			8           & 23388.6 \\
+			16          & 57791.5 \\
+			\hline
+		\end{tabularx}
+	\end{minipage}
+
+	\centering
+
+	\begin{minipage}{.49\linewidth}
+		\centering
+		\caption*{Область 128x128x128}
+		точность $1e^{-2}$
+		\begin{tabularx}{\linewidth}{|X|X|}
+			\hline
+			n processes & time    \\
+			\hline
+			1           & 11145.6 \\
+			2           & 5782.32 \\
+			4           & 12381.1 \\
+			8           & 24338.2 \\
+			16          & 58859.8 \\
+			\hline
+		\end{tabularx}
+	\end{minipage}%
+\end{table*}
+
+Тут у всех задач примерно одинаковая динамика - прекрасные результаты для двух процессов и резкое падение
+эффективности на большем количестве процессов. Я полагаю это связано с тем, что OpenMP создаёт несколько тредов
+для каждого из процессов, что замедляет вычисления.
+
+Если сравнивать с лучшими результатами ЛР №7, то на малых данных разница незаметна,
+на средних и больших данных значительное отставание у OpenMP.
+
+Скорее всего OpenMP мог бы показать себя лучше если бы у меня было больше ядер процессора.
 
 \se{Выводы}
 
