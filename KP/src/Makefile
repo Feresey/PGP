@@ -26,7 +26,7 @@ HEADERS = helpers.cuh helpers.hpp ssaa.hpp scene.hpp \
 		vec/vec3.hpp \
 
 CU_SOURCES  = mat/mat.cu vec/vec.cu ssaa.cu render/render.cu helpers.cu
-CPP_SOURCES = main.cpp scene.cpp render/render.cpp
+CPP_SOURCES = main.cpp scene.cpp render/render.cpp render/objects.cpp
 
 SOURCES = $(CU_SOURCES)
 
