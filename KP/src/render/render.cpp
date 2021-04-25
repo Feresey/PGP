@@ -17,9 +17,20 @@ Renderer::Renderer(Scene scene)
 {
 }
 
+void octa(std::vector<Polygon>& poly, const Object& fp);
+void dodek(std::vector<Polygon>& poly, const Object& fp);
+void icos(std::vector<Polygon>& poly, const Object& fp);
+
 std::vector<Polygon> polygons(const Scene& scene)
 {
-    return {};
+    std::vector<Polygon> poly;
+    octa(poly, scene.octahedron);
+    dodek(poly, scene.dodecahedron);
+    icos(poly, scene.icosahedron);
+    auto fp = scene.floor;
+    poly.push_back({ fp.c, fp.b, fp.a, fp.color });
+    poly.push_back({ fp.a, fp.d, fp.c, fp.color });
+    return poly;
 }
 
 const uchar4* Renderer::data() const

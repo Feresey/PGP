@@ -2,15 +2,21 @@ package main
 
 import (
 	"bufio"
+	_ "embed"
+	"fmt"
 	"io"
 	"math"
+	"os"
 	"strconv"
 	"strings"
+	"text/template"
 )
 
 type vec3 struct {
 	x, y, z float64
 }
+
+func (v vec3) String() string { return fmt.Sprintf("{%f, %f, %f}", v.x, v.y, v.z) }
 
 func (v vec3) Len() float64 { return math.Sqrt(v.x*v.x + v.y*v.y + v.z*v.z) }
 
@@ -21,11 +27,11 @@ type Polygon struct {
 type Object struct {
 	Vertices []vec3
 	Polygons []Polygon
-	maxCoord float64
+	MaxCoord float64
 }
 
 func readObj(r io.Reader) (*Object, error) {
-	var res Object
+	var obj Object
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		if len(scanner.Text()) == 0 {
@@ -38,7 +44,7 @@ func readObj(r io.Reader) (*Object, error) {
 			v.x, _ = strconv.ParseFloat(words[2], 32)
 			v.y, _ = strconv.ParseFloat(words[3], 32)
 			v.z, _ = strconv.ParseFloat(words[4], 32)
-			res.Vertices = append(res.Vertices, v)
+			obj.Vertices = append(obj.Vertices, v)
 		case "f":
 			getInt := func(s string) int {
 				i, _ := strconv.Atoi(strings.Split(s, "/")[0])
@@ -48,69 +54,47 @@ func readObj(r io.Reader) (*Object, error) {
 			ib := getInt(words[2])
 			ic := getInt(words[3])
 
-			a := res.Vertices[ia]
-			b := res.Vertices[ib]
-			c := res.Vertices[ic]
+			a := obj.Vertices[ia-1]
+			b := obj.Vertices[ib-1]
+			c := obj.Vertices[ic-1]
 			mx := func(v vec3) {
 				ln := v.Len()
-				if res.maxCoord < ln {
-					res.maxCoord = ln
+				if obj.MaxCoord < ln {
+					obj.MaxCoord = ln
 				}
 			}
 			mx(a)
 			mx(b)
 			mx(c)
-			res.Polygons = append(res.Polygons, Polygon{a, b, c})
+			obj.Polygons = append(obj.Polygons, Polygon{a, b, c})
 		}
 	}
-	return nil, scanner.Err()
+	return &obj, scanner.Err()
 }
 
-// void import_obj_to_scene(std::vector<Trig>& scene_trigs,
-//     const std::string& filepath, const Object& fp)
-// {element
-//     std::ifstream is(filepath);
-//     if (!is) {
-//         std::string desc = "can't open " + filepath;
-//         FAILF(desc);
-//     }
-//     float r = 0;
-//     std::vector<vec3> vertices;
-//     std::vector<Trig> figure_trigs;
-//     std::string line;
-//     while (std::getline(is, line)) {
-//         std::vector<std::string> buffer = split_string(line, ' ');
-//         if (line.empty()) {
-//             continue;
-//         } else if (buffer[0] == "v") {
-//             float x = std::stod(buffer[2]);
-//             float y = std::stod(buffer[3]);
-//             float z = std::stod(buffer[4]);
+func must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
 
-//             vertices.push_back({ x, y, z });
-//         } else if (buffer[0] == "f") {
-//             std::vector<std::string> indexes = split_string(buffer[1], '/');
-//             vec3 a = vertices[std::stoi(indexes[0]) - 1];
-//             indexes = split_string(buffer[2], '/');
-//             vec3 b = vertices[std::stoi(indexes[0]) - 1];
-//             indexes = split_string(buffer[3], '/');
-//             vec3 c = vertices[std::stoi(indexes[0]) - 1];
-
-//             r = std::max(r, a.len());
-//             r = std::max(r, b.len());
-//             r = std::max(r, c.len());
-
-//             figure_trigs.push_back(Trig { a, b, c, fp.color });
-//         }
-//     }
-//     for (auto& it : figure_trigs) {
-//         float k = fp.radius / r;
-//         vec3 a = (it.a * k) + fp.center;
-//         vec3 b = (it.b * k) + fp.center;
-//         vec3 c = (it.c * k) + fp.center;
-//         scene_trigs.push_back({ a, b, c, it.color });
-//     }
-// }
+//go:embed res.cpp.tpl
+var tpl string
 
 func main() {
+	file, err := os.Open(os.Args[1])
+	must(err)
+	defer file.Close()
+
+	obj, err := readObj(file)
+	must(err)
+
+	err = template.Must(
+		template.New("").
+			Funcs(template.FuncMap{
+				"show": func(p Polygon) string { return fmt.Sprintf("{%s, %s, %s}", p.a, p.b, p.c) },
+			}).
+			Parse(tpl),
+	).Execute(os.Stdout, obj)
+	must(err)
 }

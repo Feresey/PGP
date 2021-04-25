@@ -87,14 +87,6 @@ int main(int argc, char* argv[])
 
     Renderer* renderer = NewRenderer(mode, scene);
 
-    // if (rank == 0) {
-    //     // import_obj_to_scene(scene_trigs, "hex.obj", task.hex);
-    //     // import_obj_to_scene(scene_trigs, "octa.obj", task.octa);
-    //     // import_obj_to_scene(scene_trigs, "icos.obj", task.icos);
-    //     // add_floor_to_scene(scene_trigs, task.floor);
-    // }
-    // renderer->mpi_bcast_poly();
-
     MPI_ERR(MPI_Barrier(MPI_COMM_WORLD));
 
     for (int frame = rank; frame < scene.n_frames; frame += n_processes) {

@@ -4,7 +4,6 @@
 #include "scene.hpp"
 #include "vec/vec3.hpp"
 
-
 enum ComputeMode {
     CUDA,
     OPEN_MP
