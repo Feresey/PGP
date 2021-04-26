@@ -124,7 +124,7 @@ NVCCFLAGS ?= --std=c++14 -rdc=true\
 		--expt-relaxed-constexpr
 
 ifeq ($(BENCH),on)
-CFLAGS    = -O3 -DBENCHMARK
+CFLAGS    = -O3 -DBENCHMARK -fopenmp
 NVCCFLAGS += -O3
 else
 CFLAGS    += -g3

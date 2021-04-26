@@ -90,6 +90,8 @@ int main(int argc, char* argv[])
     MPI_ERR(MPI_Barrier(MPI_COMM_WORLD));
 
     for (int frame = rank; frame < scene.n_frames; frame += n_processes) {
+        // if (frame != 0)
+        //     break;
         auto start = std::chrono::high_resolution_clock::now();
         renderer->Render(frame);
         auto end = std::chrono::high_resolution_clock::now();
@@ -97,6 +99,16 @@ int main(int argc, char* argv[])
         char output_path[256];
         sprintf(output_path, scene.output_pattern.data(), frame);
         write_image(output_path, renderer->data(), scene.w, scene.h);
+
+        // const auto& data = renderer->data();
+
+        // for (int i = 0; i < scene.h; ++i) {
+        //     for (int j = 0; j < scene.w; ++j) {
+        //         auto p = data[i * scene.w + j];
+        //         fprintf(stderr, "%02x%02x%02x%02X ", p.x, p.y, p.z, p.w);
+        //     }
+        //     fprintf(stderr, "\n");
+        // }
 
         std::cerr
             << frame << "\t"
