@@ -16,7 +16,7 @@ __host__ __device__ uchar4 ssaa_algo(
         }
     }
     auto pix = res * (1.0 / (kernel_w * kernel_h));
-    return make_uchar4(pix.x, pix.y, pix.z, 255);
+    return make_uchar4(pix.x, pix.y, pix.z, 255u);
 }
 
 __global__ void ssaa_kernel(

@@ -128,7 +128,7 @@ __host__ __device__ uchar4 ray(
 
 __global__ void render_cuda_kernel(
     uchar4* data, int w, int h,
-    vec3 pc, vec3 pv, float angle,
+    vec3 pv, vec3 pc, float angle,
     const Polygon* scene_trigs, int ntrigs,
     Light* lights, int nlights)
 {
