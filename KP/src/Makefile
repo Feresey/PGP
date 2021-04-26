@@ -55,8 +55,8 @@ TARGET_OBJECTS = $$(CPP_OBJECTS) $$(CU_OBJECTS)
 
 LDFLAGS = -lm -lmpi
 IFLAGS = -I.
-NVCCFLAGS = -rdc=true
-GCCFLAGS = --std=c++11
+NVCCFLAGS = -rdc=true --compiler-options "-fopenmp"
+GCCFLAGS = --std=c++11 -fopenmp
 
 $(TARGET): $$(TARGET_OBJECTS)
 	$$(NVCC) -ccbin=$$(MPICXX) $$(NVCCFLAGS) $$(IFLAGS) $$(LDFLAGS) $$^ -o $$@

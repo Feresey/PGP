@@ -84,7 +84,7 @@ void OpenMPRenderer::Render(int frame)
 {
     const float dw = 2.0f / (float(render_w) - 1.0f);
     const float dh = 2.0f / (float(render_h) - 1.0f);
-    const float z = 1.0f / tanf((scene.angle * M_PIf32) / 360.0f);
+    const float z = 1.0f / tanf((scene.angle * M_PI) / 360.0f);
     std::pair<vec3, vec3> p = cum_view(frame);
 
     vec3 bz = (p.second - p.first).normalize();
