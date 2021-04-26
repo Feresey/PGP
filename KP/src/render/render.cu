@@ -1,6 +1,3 @@
-#include <mpi.h>
-
-#include "helpers.hpp"
 #include "mat/mat3.hpp"
 #include "render.cuh"
 #include "scene.hpp"
@@ -71,11 +68,11 @@ __host__ __device__ vec3 phong_model(
                 &hit_t)
             && (hit_t > d || (hit_t > d || (d - hit_t < 0.0005f)))) {
             float k = intensity / (d + 0.001f);
-            diffuse += lights[i].color * max(kd * k * vec3::dot_product(L, normal), 0.0f);
+            diffuse += lights[i].color * std::max(kd * k * vec3::dot_product(L, normal), 0.0f);
 
             vec3 R = vec3::reflect(-L, normal).normalize();
             vec3 S = -dir;
-            specular += lights[i].color * ks * k * pow(max(vec3::dot_product(R, S), 0.0f), 32);
+            specular += lights[i].color * ks * k * pow(std::max(vec3::dot_product(R, S), 0.0f), 32);
         }
     }
     return ambient * trig.color + diffuse * trig.color + specular * trig.color;
@@ -83,12 +80,12 @@ __host__ __device__ vec3 phong_model(
 
 __host__ __device__ uchar4 color_from_normalized(const vec3& v)
 {
-    float x = min(v.x, 1.0f);
-    x = max(x, 0.0f);
-    float y = min(v.y, 1.0f);
-    y = max(y, 0.0f);
-    float z = min(v.z, 1.0f);
-    z = max(z, 0.0f);
+    float x = std::min(v.x, 1.0f);
+    x = std::max(x, 0.0f);
+    float y = std::min(v.y, 1.0f);
+    y = std::max(y, 0.0f);
+    float z = std::min(v.z, 1.0f);
+    z = std::max(z, 0.0f);
     return make_uchar4(255. * x, 255. * y, 255. * z, 0u);
 }
 
@@ -155,37 +152,21 @@ __global__ void render_cuda_kernel(
         }
 }
 
-CUDARenderer::CUDARenderer(const Scene& scene)
-    : scene(scene)
-    , poly(polygons(scene))
-    , ssaa_rate(2)
-    , render_w(ssaa_rate * scene.w)
-    , render_h(ssaa_rate * scene.h)
-    , render_size(render_w * render_h)
-    , data_render(size_t(render_size))
-    , data_ssaa(size_t(scene.w * scene.h))
+CUDARenderer::CUDARenderer(Scene scene)
+    : Renderer(scene)
 {
-}
-
-void CUDARenderer::retarded(const Scene& sscene) {
-    auto scene = *new Scene(sscene);
-    debug("create %p, %ld", (void*)(&scene), scene.lights.size());
     size_t poly_size = sizeof(Polygon) * poly.size();
     CUDA_ERR(cudaMalloc(&dev_poly, poly_size));
     CUDA_ERR(cudaMemcpy(dev_poly, poly.data(), poly_size, cudaMemcpyHostToDevice));
 
-    size_t lights_size = sizeof(Light) * scene.n_lights;
-    debug("malloc %li bytes. %li %li", lights_size, sizeof(Light), scene.n_lights);
+    debug("lights %ld", scene.lights.size());
+
+    size_t lights_size = sizeof(Light) * scene.lights.size();
     CUDA_ERR(cudaMalloc(&dev_lights, lights_size));
-    CUDA_ERR(cudaMemcpy(dev_lights, (void*)scene.lights.data(), lights_size, cudaMemcpyHostToDevice));
+    CUDA_ERR(cudaMemcpy(dev_lights, scene.lights.data(), lights_size, cudaMemcpyHostToDevice));
 
     CUDA_ERR(cudaMalloc(&dev_render, sizeof(uchar4) * render_size));
     CUDA_ERR(cudaMalloc(&dev_ssaa, sizeof(uchar4) * scene.w * scene.h));
-}
-
-const uchar4* CUDARenderer::data() const
-{
-    return data_ssaa.data();
 }
 
 CUDARenderer::~CUDARenderer()
@@ -201,14 +182,9 @@ CUDARenderer::~CUDARenderer()
 #define NBLOCKSD2 dim3(16, 16)
 #define NTHREADSD2 dim3(16, 16)
 
-void CUDARenderer::mpi_bcast_poly()
-{
-    bcast_bytes(poly.data(), int(poly.size() * sizeof(Polygon)));
-}
-
 void CUDARenderer::Render(int frame)
 {
-    std::pair<vec3, vec3> p = cum_view(scene, frame);
+    std::pair<vec3, vec3> p = cum_view(frame);
     START_KERNEL((render_cuda_kernel<<<NBLOCKSD2, NTHREADSD2>>>(
         dev_render, render_w, render_h,
         p.first, p.second, scene.angle,

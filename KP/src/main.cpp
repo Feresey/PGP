@@ -41,11 +41,7 @@ void write_image(
 
 template<class T>
 void render(int rank, int n_processes, const Scene& scene, T renderer){
-        debug("FUCK %ld", scene.lights.size());
-        debug("FUCK %ld", renderer.scene.lights.size());
     for (int frame = rank; frame < scene.n_frames; frame += n_processes) {
-        if (frame = 0)
-            break;
         auto start = std::chrono::high_resolution_clock::now();
         renderer.Render(frame);
         auto end = std::chrono::high_resolution_clock::now();
@@ -121,9 +117,7 @@ int main(int argc, char* argv[])
     MPI_ERR(MPI_Barrier(MPI_COMM_WORLD));
 
     if (mode == CUDA) {
-        auto retarded = CUDARenderer(scene);
-        retarded.retarded(scene);
-        render(rank, n_processes, scene, retarded);
+        render(rank, n_processes, scene, CUDARenderer(scene));
     }else {
         render(rank, n_processes, scene, OpenMPRenderer(scene));
     }

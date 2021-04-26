@@ -9,45 +9,43 @@ enum ComputeMode {
     OPEN_MP
 };
 
-struct OpenMPRenderer {
-    Scene scene;
+class Renderer {
+protected:
+    const Scene scene;
     std::vector<Polygon> poly;
 
-    int ssaa_rate;
-    int render_w, render_h;
-    int render_size;
+    const int ssaa_rate;
+    const int render_w, render_h;
+    const int render_size;
 
     std::vector<uchar4> data_render, data_ssaa;
 
-    const uchar4* data() const;
-    void mpi_bcast_poly();
+    std::pair<vec3, vec3> cum_view(int frame) const;
+    Renderer(Scene scene);
 
-    OpenMPRenderer(const Scene& scene);
-    void Render(int frame);
+public:
+    void mpi_bcast_poly();
+    const uchar4* data() const;
+    virtual void Render(int frame) = 0;
+    virtual ~Renderer() = default;
 };
 
-struct CUDARenderer {
-    Scene scene;
-    std::vector<Polygon> poly;
+class OpenMPRenderer : public Renderer {
+public:
+    OpenMPRenderer(Scene scene);
+    void Render(int frame) override;
+};
 
-    int ssaa_rate;
-    int render_w, render_h;
-    int render_size;
-
-    std::vector<uchar4> data_render, data_ssaa;
-
+class CUDARenderer : public Renderer {
     Polygon* dev_poly;
     Light* dev_lights;
     uchar4* dev_render;
     uchar4* dev_ssaa;
 
-    const uchar4* data() const;
-    void mpi_bcast_poly();
-
-    CUDARenderer(const Scene& scene);
-    void retarded(const Scene& scene);
+public:
+    CUDARenderer(Scene scene);
     ~CUDARenderer();
-    void Render(int frame);
+    void Render(int frame) override;
 };
 
 __host__ __device__ uchar4 ray(
@@ -56,6 +54,7 @@ __host__ __device__ uchar4 ray(
     const Light* lights, int nlights);
 
 std::vector<Polygon> polygons(const Scene& scene);
-std::pair<vec3, vec3> cum_view(const Scene& scene, int frame);
+
+Renderer* NewRenderer(ComputeMode mode, Scene scene);
 
 #endif
