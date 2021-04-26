@@ -128,7 +128,7 @@ __host__ __device__ uchar4 ray(
 
 __global__ void render_cuda_kernel(
     uchar4* data, int w, int h,
-    vec3 pv, vec3 pc, float angle,
+    vec3 pc, vec3 pv, float angle,
     const Polygon* scene_trigs, int ntrigs,
     Light* lights, int nlights)
 {
@@ -147,7 +147,11 @@ __global__ void render_cuda_kernel(
     for (int j = id_y; j < h; j += offset_y)
         for (int i = id_x; i < w; i += offset_x) {
             vec3 v(-1.0f + dw * i, (-1.0 + dh * j) * h / w, z);
-            vec3 dir = (bx * v + by * v + bz * v).normalize();
+            vec3 dir = vec3(
+                bx.x * v.x + by.x * v.y + bz.x * v.z,
+                bx.y * v.x + by.y * v.y + bz.y * v.z,
+                bx.z * v.x + by.z * v.y + bz.z * v.z)
+                           .normalize();
             data[(h - 1 - j) * w + i] = ray(pc, dir, scene_trigs, ntrigs, lights, nlights);
         }
 }

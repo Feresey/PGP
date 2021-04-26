@@ -28,6 +28,7 @@ std::vector<Polygon> polygons(const Scene& scene)
     dodek(poly, scene.dodecahedron);
     icos(poly, scene.icosahedron);
     auto fp = scene.floor;
+    std::cerr << fp << std::endl;
     poly.push_back({ fp.c, fp.b, fp.a, fp.color });
     poly.push_back({ fp.a, fp.d, fp.c, fp.color });
     return poly;
@@ -86,7 +87,7 @@ void OpenMPRenderer::Render(int frame)
     const float z = 1.0f / tanf((scene.angle * M_PIf32) / 360.0f);
     std::pair<vec3, vec3> p = cum_view(frame);
 
-    vec3 bz = (p.first - p.second).normalize();
+    vec3 bz = (p.second - p.first).normalize();
     vec3 bx = vec3::cross_product(bz, vec3(0.0f, 0.0f, 1.0f)).normalize();
     vec3 by = vec3::cross_product(bx, bz).normalize();
 
@@ -95,9 +96,13 @@ void OpenMPRenderer::Render(int frame)
         int i = pix % render_w;
         int j = pix / render_w;
         const vec3 v(-1.0f + dw * float(i), (-1.0f + dh * float(j)) * float(render_h) / float(render_w), z);
-        vec3 dir = (bx * v + by * v + bz * v).normalize();
+        vec3 dir = vec3(
+            bx.x * v.x + by.x * v.y + bz.x * v.z,
+            bx.y * v.x + by.y * v.y + bz.y * v.z,
+            bx.z * v.x + by.z * v.y + bz.z * v.z)
+                       .normalize();
         data_render[size_t((render_h - 1 - j) * render_w + i)] = ray(
-            p.second, dir,
+            p.first, dir,
             poly.data(), int(poly.size()),
             scene.lights.data(), int(scene.lights.size()));
     }
