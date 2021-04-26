@@ -1,7 +1,6 @@
 #include <iostream>
 
 #include "vec/vec3.hpp"
-#include "vec/vec4.hpp"
 
 #include "mat3.hpp"
 

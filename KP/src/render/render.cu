@@ -68,11 +68,11 @@ __host__ __device__ vec3 phong_model(
                 &hit_t)
             && (hit_t > d || (hit_t > d || (d - hit_t < 0.0005f)))) {
             float k = intensity / (d + 0.001f);
-            diffuse += lights[i].color * std::max(kd * k * vec3::dot_product(L, normal), 0.0f);
+            diffuse += lights[i].color * max(kd * k * vec3::dot_product(L, normal), 0.0f);
 
             vec3 R = vec3::reflect(-L, normal).normalize();
             vec3 S = -dir;
-            specular += lights[i].color * ks * k * pow(std::max(vec3::dot_product(R, S), 0.0f), 32);
+            specular += lights[i].color * ks * k * pow(max(vec3::dot_product(R, S), 0.0f), 32);
         }
     }
     return ambient * trig.color + diffuse * trig.color + specular * trig.color;
@@ -80,12 +80,12 @@ __host__ __device__ vec3 phong_model(
 
 __host__ __device__ uchar4 color_from_normalized(const vec3& v)
 {
-    float x = std::min(v.x, 1.0f);
-    x = std::max(x, 0.0f);
-    float y = std::min(v.y, 1.0f);
-    y = std::max(y, 0.0f);
-    float z = std::min(v.z, 1.0f);
-    z = std::max(z, 0.0f);
+    float x = min(v.x, 1.0f);
+    x = max(x, 0.0f);
+    float y = min(v.y, 1.0f);
+    y = max(y, 0.0f);
+    float z = min(v.z, 1.0f);
+    z = max(z, 0.0f);
     return make_uchar4(255. * x, 255. * y, 255. * z, 0u);
 }
 

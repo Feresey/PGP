@@ -26,11 +26,11 @@ HEADERS = helpers.cuh helpers.hpp ssaa.hpp scene.hpp \
 		vec/vec3.hpp \
 
 CU_SOURCES  = mat/mat.cu vec/vec.cu ssaa.cu render/render.cu helpers.cu ALL.cu
-# CPP_SOURCES = main.cpp scene.cpp render/render.cpp render/objects.cpp
+CPP_SOURCES = $(wildcard *.cpp) $(wildcard render/*.cpp) $(wildcard vec/*.cpp) $(wildcard mat/*.cpp)
 
-SOURCES = $(CU_SOURCES)
+SOURCES = $(CU_SOURCES) $(CPP_SOURCES) $(HEADERS)
 
-COPY_TARGETS = $(addprefix COPY_,$(CU_SOURCES) $(CPP_SOURCES) $(HEADERS))
+COPY_TARGETS = $(addprefix COPY_,$(SOURCES))
 
 .PHONY: $(COPY_TARGETS)
 $(COPY_TARGETS): COPY_%:
@@ -99,7 +99,7 @@ deps: $(DEPS_LIST) | $(DEPS_DIR)
 CPP_OBJECTS = $(foreach obj,$(CPP_SOURCES),$(BUILDDIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(obj))).o)
 CU_OBJECTS = $(foreach obj,$(CU_SOURCES),$(BUILDDIR)/$(subst /,__,$(shell realpath --relative-to $(CURDIR) $(obj))).o)
 
-TARGET_OBJECTS = $(CPP_OBJECTS) $(CU_OBJECTS)
+TARGET_OBJECTS = $(CU_OBJECTS)
 
 LDFLAGS = -lm -lmpi
 

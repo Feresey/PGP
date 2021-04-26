@@ -6,7 +6,6 @@
 #include "helpers.cuh"
 
 class vec3;
-class vec4;
 
 struct mat3 {
     float m[3][3];
