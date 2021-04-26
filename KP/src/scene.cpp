@@ -63,6 +63,7 @@ std::istream& operator>>(std::istream& is, Scene& p)
         >> p.floor
         >> p.n_lights;
     p.lights.resize(size_t(p.n_lights));
+    debug("resize lights with %d. %li", p.n_lights, p.lights.size());
     for (int i = 0; i < p.n_lights; ++i) {
         is >> p.lights[size_t(i)];
     }
@@ -79,8 +80,9 @@ std::ostream& operator<<(std::ostream& os, const Scene& p)
        << "icos: " << p.icosahedron << '\n'
        << "floor: " << p.floor << '\n'
        << "nlights: " << p.lights.size() << '\n';
-    for (auto& it : p.lights)
-        os << it;
+    for (auto& it : p.lights){
+        os << it << std::endl;
+    }
     return os;
 }
 

@@ -5,18 +5,6 @@
 #include "render.cuh"
 #include "ssaa.hpp"
 
-Renderer::Renderer(Scene scene)
-    : scene(scene)
-    , poly(polygons(scene))
-    , ssaa_rate(2)
-    , render_w(ssaa_rate * scene.w)
-    , render_h(ssaa_rate * scene.h)
-    , render_size(render_w * render_h)
-    , data_render(size_t(render_size))
-    , data_ssaa(size_t(scene.w * scene.h))
-{
-}
-
 void octa(std::vector<Polygon>& poly, const Object& fp);
 void dodek(std::vector<Polygon>& poly, const Object& fp);
 void icos(std::vector<Polygon>& poly, const Object& fp);
@@ -33,12 +21,12 @@ std::vector<Polygon> polygons(const Scene& scene)
     return poly;
 }
 
-const uchar4* Renderer::data() const
+const uchar4* OpenMPRenderer::data() const
 {
     return data_ssaa.data();
 }
 
-std::pair<vec3, vec3> Renderer::cum_view(int frame) const
+std::pair<vec3, vec3> cum_view(const Scene& scene, int frame)
 {
     const Camera& c = scene.cum_center;
     const Camera& n = scene.cum_dir;
@@ -58,23 +46,19 @@ std::pair<vec3, vec3> Renderer::cum_view(int frame) const
     };
 }
 
-Renderer* NewRenderer(ComputeMode mode, Scene scene)
-{
-    switch (mode) {
-    default:
-    case CUDA:
-        return new CUDARenderer(scene);
-    case OPEN_MP:
-        return new OpenMPRenderer(scene);
-    }
-}
-
-OpenMPRenderer::OpenMPRenderer(Scene scene)
-    : Renderer(scene)
+OpenMPRenderer::OpenMPRenderer(const Scene& scene)
+    : scene(scene)
+    , poly(polygons(scene))
+    , ssaa_rate(2)
+    , render_w(ssaa_rate * scene.w)
+    , render_h(ssaa_rate * scene.h)
+    , render_size(render_w * render_h)
+    , data_render(size_t(render_size))
+    , data_ssaa(size_t(scene.w * scene.h))
 {
 }
 
-void Renderer::mpi_bcast_poly()
+void OpenMPRenderer::mpi_bcast_poly()
 {
     bcast_bytes(poly.data(), int(poly.size() * sizeof(Polygon)));
 }
@@ -84,7 +68,7 @@ void OpenMPRenderer::Render(int frame)
     const float dw = 2.0f / (float(render_w) - 1.0f);
     const float dh = 2.0f / (float(render_h) - 1.0f);
     const float z = 1.0f / tanf((scene.angle * M_PIf32) / 360.0f);
-    std::pair<vec3, vec3> p = cum_view(frame);
+    std::pair<vec3, vec3> p = cum_view(scene, frame);
 
     vec3 bz = (p.first - p.second).normalize();
     vec3 bx = vec3::cross_product(bz, vec3(0.0f, 0.0f, 1.0f)).normalize();

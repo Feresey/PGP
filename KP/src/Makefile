@@ -116,12 +116,11 @@ GCCFLAGS = $(CFLAGS) \
 		-Wctor-dtor-privacy -Wnon-virtual-dtor \
 		-Wunreachable-code -fstack-protector
 
-NVCCFLAGS ?= --std=c++14 -rdc=true\
+NVCCFLAGS ?= --std=c++14 \
 		-Werror cross-execution-space-call \
-		-arch=sm_35 -Wno-deprecated-gpu-targets \
+		-arch=compute_35 -Wno-deprecated-gpu-targets \
 		-D_FORCE_INLINES -Xcompiler -fPIC \
-		-Wno-deprecated-declarations \
-		--expt-relaxed-constexpr
+		-Wno-deprecated-declarations
 
 ifeq ($(BENCH),on)
 CFLAGS    = -O3 -DBENCHMARK -fopenmp
